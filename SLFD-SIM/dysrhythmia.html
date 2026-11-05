@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLFD Cadre: ECG & Dysrhythmia Simulator</title>
+  <style>
+    /* NATIVE BROWSER TAB RESET & VARIABLES */
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-inner: #0b1120;
+      --border-dark: #334155;
+      --slfd-red: #dc2626;
+      --slfd-red-hover: #b91c1c;
+      --slfd-gold: #f59e0b;
+      --slfd-gold-hover: #d97706;
+      --slfd-blue: #2563eb;
+      --slfd-emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; 
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .font-mono-code { font-family: var(--font-mono); }
+
+    /* FULL WIDTH HEADER */
+    header {
+      background-color: #0f172a;
+      border-bottom: 2px solid rgba(220, 38, 38, 0.6);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .badge-red {
+      background-color: var(--slfd-red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .badge-gold {
+      background-color: rgba(245, 158, 11, 0.2);
+      color: var(--slfd-gold);
+      border: 1px solid var(--slfd-gold);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+    .btn-header {
+      background-color: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-header:hover { background-color: #334155; color: #fff; }
+
+    /* DESKTOP WORKSPACE LAYOUT */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 54px);
+      overflow: hidden;
+    }
+
+    /* LEFT TELEMETRY PANEL */
+    .sidebar-telemetry {
+      width: 380px;
+      background-color: #0b1324;
+      border-right: 1px solid var(--border-dark);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .monitor-card {
+      background-color: #000;
+      border: 2px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,1);
+    }
+    .monitor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #64748b;
+      margin-right: 6px;
+      transition: all 0.3s;
+    }
+
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-family: var(--font-mono);
+      text-align: center;
+    }
+    .vital-tile {
+      background-color: rgba(15, 23, 42, 0.9);
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px 4px;
+    }
+    .vital-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+    .vital-val { font-size: 20px; font-weight: 900; margin-top: 4px; }
+
+    .scene-bar {
+      background-color: var(--card-inner);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+
+    .findings-card {
+      background-color: var(--card-inner);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 200px;
+    }
+    .findings-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 6px;
+    }
+    .findings-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+    .findings-item {
+      padding-bottom: 6px;
+      border-bottom: 1px solid #1e293b;
+      line-height: 1.5;
+    }
+
+    /* RIGHT WORKSPACE PANEL */
+    .workspace-main {
+      flex: 1;
+      background-color: var(--bg-dark);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .phase-nav {
+      background-color: #0b1324;
+      border-bottom: 1px solid var(--border-dark);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-active { background-color: var(--slfd-gold); color: #020617; font-weight: 800; }
+    .tab-unlocked { background-color: #1e293b; color: #cbd5e1; border-color: #334155; }
+    .tab-locked { background-color: #0f172a; color: #475569; opacity: 0.5; cursor: not-allowed; }
+
+    .phase-content-area {
+      padding: 24px;
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .card {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    .cad-alert-box { border-left: 4px solid var(--slfd-gold); background-color: #121c2d; }
+
+    /* BUTTONS */
+    .btn-primary {
+      background-color: var(--slfd-blue);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .btn-primary:hover { background-color: #1d4ed8; }
+
+    .btn-action-gold {
+      background-color: var(--slfd-gold);
+      color: #020617;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-transform: uppercase;
+      width: 100%;
+    }
+    .btn-action-gold:hover { background-color: var(--slfd-gold-hover); }
+
+    .btn-danger {
+      background-color: var(--slfd-red);
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 14px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-transform: uppercase;
+      width: 100%;
+      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4);
+    }
+    .btn-danger:hover { background-color: var(--slfd-red-hover); }
+
+    /* ASSESSMENTS */
+    .assessment-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .assessment-btn {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      color: var(--text-main);
+      transition: all 0.2s;
+    }
+    .assessment-btn:hover { border-color: var(--slfd-gold); background-color: #24324a; transform: translateY(-2px); }
+    .assessment-icon {
+      font-size: 20px;
+      padding: 6px;
+      background-color: #0f172a;
+      border-radius: 4px;
+      border: 1px solid #334155;
+    }
+
+    /* FORMS */
+    select, input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      background-color: #0b1120;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--slfd-gold); box-shadow: 0 0 0 1px var(--slfd-gold); }
+
+    /* ORDER QUEUE */
+    .order-queue-box {
+      background-color: var(--card-inner);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 150px;
+    }
+    .order-row {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    .order-index {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      margin-right: 12px;
+    }
+    .btn-sm-ctrl { background-color: #0f172a; color: #cbd5e1; border: 1px solid #475569; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    .btn-sm-ctrl:hover { background-color: #334155; }
+    .btn-sm-del { background-color: #450a0a; color: #fca5a5; border: 1px solid #991b1b; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    .btn-sm-del:hover { background-color: #7f1d1d; }
+
+    /* MODALS & OVERLAYS */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-panel {
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      max-width: 1000px;
+      width: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,1);
+    }
+    .ecg-paper-bg {
+      background-color: #ffe8eb;
+      background-image: 
+        linear-gradient(to right, rgba(239, 68, 68, 0.22) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(239, 68, 68, 0.22) 1px, transparent 1px),
+        linear-gradient(to right, rgba(220, 38, 38, 0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(220, 38, 38, 0.5) 1px, transparent 1px);
+      background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
+      border: 1px solid #f87171;
+      border-radius: 6px;
+      padding: 10px;
+      overflow-x: auto;
+    }
+
+    .start-screen-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, #0f172a 0%, #070b12 100%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .start-box {
+      max-width: 600px;
+      background-color: rgba(15, 23, 42, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    .btn-launch {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 16px 32px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 6px 15px rgba(220, 38, 38, 0.5);
+      margin-top: 24px;
+      transition: transform 0.15s, background 0.2s;
+    }
+    .btn-launch:hover { transform: scale(1.03); background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ================= LAUNCH SCREEN OVERLAY (GATES SIMULATION) ================= -->
+  <div id="startOverlay" class="start-screen-overlay">
+    <div class="start-box">
+      <span class="badge-red" style="font-size: 13px;">SUGAR LAND FIRE DEPARTMENT</span>
+      <h2 style="font-size: 26px; font-weight: 800; color: #fff; margin-top: 16px;">ECG & Dysrhythmia Simulator</h2>
+      <div style="font-size: 13px; color: var(--slfd-gold); font-family: var(--font-mono); font-weight: 600; margin-top: 8px;">
+        TX DSHS 25 TAC §157.38 / SLFD Clinical Operating Guidelines
+      </div>
+      <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6; margin-top: 16px;">
+        Experience high-acuity ECG and electrical therapy scenarios. Formulate size-up impressions, uncover real-time diagnostic clues, inspect 12-lead tracings, rule out mimics, and build sequential treatment orders from scratch.
+      </p>
+      <div style="font-size: 12px; color: #64748b; font-family: var(--font-mono); margin-top: 16px;">
+        Standalone Native Desktop Application • Unbiased Testing Protocol
+      </div>
+      <button type="button" class="btn-launch" onclick="startSimulation()">
+        ▶ Start Clinical Simulation
+      </button>
+    </div>
+  </div>
+
+  <!-- TOP APP HEADER -->
+  <header>
+    <div class="header-left">
+      <span class="badge-red">SLFD CADRE</span>
+      <strong style="font-size: 16px; color: #fff;">Cardiology & Dysrhythmia Simulator</strong>
+      <span style="font-size: 12px; color: var(--text-muted); border-left: 1px solid #334155; padding-left: 12px;">
+        Ref: 25 TAC §157.38 / COG Ver. 26.8
+      </span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="badge-gold" id="activeCaseBadge">INCIDENT #2027-041</span>
+      <button type="button" onclick="cycleScenario()" class="btn-header">
+        <span>Cycle Random Incident</span> ↻
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN COCKPIT VIEWPORT -->
+  <div class="app-container">
+    <aside class="sidebar-telemetry">
+      <div class="monitor-card">
+        <div class="monitor-header">
+          <span style="display: flex; align-items: center;">
+            <span class="pulse-dot" id="pulseIndicator"></span>LEAD II MONITOR
+          </span>
+          <span id="syncModeIndicator" style="color: #64748b; font-weight: bold;">SYNC: OFF</span>
+        </div>
+        <canvas id="liveLead2Canvas" width="340" height="90" style="width: 100%; height: 90px; background: #000; display: block; border-radius: 4px;"></canvas>
+      </div>
+
+      <div class="vitals-grid">
+        <div class="vital-tile"><div class="vital-lbl">HR (BPM)</div><div id="disp-hr" class="vital-val" style="color: #34d399;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">BP (NIBP)</div><div id="disp-bp" class="vital-val" style="color: #22d3ee;">--/--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">SpO2 (%)</div><div id="disp-spo2" class="vital-val" style="color: #fbbf24;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">EtCO2</div><div id="disp-etco2" class="vital-val" style="color: #fb923c;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">RESP RATE</div><div id="disp-rr" class="vital-val" style="color: #2dd4bf;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">BGL (mg/dL)</div><div id="disp-bgl" class="vital-val" style="color: #c084fc;">--</div></div>
+      </div>
+
+      <div class="scene-bar">
+        <div>
+          <span style="color: #94a3b8;">SCENE TIME: </span>
+          <span id="sceneClock" style="font-weight: 800; color: #fff; font-size: 16px;">00:00</span>
+        </div>
+        <span id="targetBadge" style="background-color: #1e3a8a; color: #93c5fd; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+          12-LEAD TARGET: ≤ 05:00
+        </span>
+      </div>
+
+      <div class="findings-card">
+        <div class="findings-header">
+          <span>Active Findings Log</span>
+          <span id="findingsCount" style="color: var(--slfd-gold);">0 Logged</span>
+        </div>
+        <div id="findingsLog" class="findings-list">
+          <div style="color: #64748b; font-style: italic; font-size: 12px;">// Uncover physical assessments in Phase 2 to reveal findings...</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace-main">
+      <nav class="phase-nav">
+        <button type="button" id="stepTab-0" class="tab-btn tab-active" onclick="switchPhaseView(0)">1. Doorway & Size-Up</button>
+        <span style="color: #475569;">&rarr;</span>
+        <button type="button" id="stepTab-1" class="tab-btn tab-locked" onclick="switchPhaseView(1)">2. Assessment Bar</button>
+        <span style="color: #475569;">&rarr;</span>
+        <button type="button" id="stepTab-2" class="tab-btn tab-locked" onclick="switchPhaseView(2)">3. Rule-Out Funnel</button>
+        <span style="color: #475569;">&rarr;</span>
+        <button type="button" id="stepTab-3" class="tab-btn tab-locked" onclick="switchPhaseView(3)">4. Treatment Orders</button>
+        <span style="color: #475569;">&rarr;</span>
+        <button type="button" id="stepTab-4" class="tab-btn tab-locked" onclick="switchPhaseView(4)">5. CQI Debrief</button>
+      </nav>
+
+      <div class="phase-content-area">
+        <!-- PHASE 1 -->
+        <div id="phase-0" class="card cad-alert-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="badge-gold" id="cadDispatchId">CAD INCIDENT: #2027-041</span>
+            <span class="badge-red">PRIORITY 1 DELTA</span>
+          </div>
+          <p id="cadDispatchText" style="font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 16px;">
+            Medic 1 dispatched Priority 1 to a 45-year-old female complaining of sudden onset palpitations, lightheadedness, and a feeling of passing out.
+          </p>
+
+          <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+            <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px;">
+              30-Second Doorway Impression (Primary Survey)
+            </div>
+            <p id="doorwayImpressionText" style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+              Patient is seated on the floor, pale, and visibly diaphoretic. Altered level of consciousness. Radial pulse feels extremely rapid, weak, and thready.
+            </p>
+          </div>
+
+          <div style="border: 1px solid rgba(37, 99, 235, 0.4); background-color: #0c162c; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="background-color: var(--slfd-blue); color: #fff; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px;">COGNITIVE GATE</span>
+              <strong style="font-size: 14px; color: #93c5fd;">Pre-Assessment Clinical Formulation</strong>
+            </div>
+            <p style="font-size: 12px; color: #94a3b8;">Formulate your clinical expectations before touching the patient. These entries will be audited.</p>
+
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px;">1. Initial Scene Appraisal & Immediate Life-Threat Concerns:</label>
+              <textarea id="cog_q1" rows="2" placeholder="Identify immediate perfusion threats, shock status..."></textarea>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px;">2. Targeted Diagnostic Strategy & Assessment Priorities:</label>
+              <textarea id="cog_q2" rows="2" placeholder="What specific assessments will you prioritize first?"></textarea>
+            </div>
+
+            <button type="button" class="btn-action-gold" onclick="submitCognitiveGate()" style="margin-top: 8px;">
+              Lock In Cognition & Unlock Physical Assessments &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- PHASE 2 -->
+        <div id="phase-1" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #fff;">Physical Assessment Action Bar</h3>
+              <p style="font-size: 12px; color: #94a3b8;">Select diagnostic actions to uncover clinical clues. Each action advances the scene clock.</p>
+            </div>
+            <button type="button" class="btn-primary" onclick="proceedToRuleOut()">
+              Formulate Rule-Out &rarr;
+            </button>
+          </div>
+          <div class="assessment-grid" id="assessmentActionGrid"></div>
+        </div>
+
+        <!-- PHASE 3 -->
+        <div id="phase-2" class="hidden card" style="display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <h3 style="font-size: 16px; font-weight: 700; color: #fff;">Diagnostic Rule-Out Funnel & Working Diagnosis</h3>
+            <p style="font-size: 12px; color: #94a3b8;">Commit to your primary working diagnosis and justify eliminating differential mimics.</p>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">1. Final Primary Working Diagnosis:</label>
+            <select id="sel_working_dx" class="font-mono-code" style="font-size: 13px; padding: 12px;">
+              <option value="">-- Select Confirmed Working Diagnosis --</option>
+              <option value="svt_unstable">Unstable Narrow Complex Tachycardia (SVT)</option>
+              <option value="svt_wpw">Stable Narrow Tachycardia with Suspected WPW</option>
+              <option value="stemi_inferior_rv">Acute Inferior STEMI with RV Infarct (V4R+)</option>
+              <option value="chb_brady">High-Degree AV Block (Symptomatic Bradycardia)</option>
+              <option value="refractory_vf">Refractory Pulseless V-Fib / Cardiac Arrest</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">2. Objective Clinical Justifications (Select all findings confirming or ruling out mimics):</label>
+            <div id="ruleOutChecklist" style="max-height: 200px; overflow-y: auto; background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">3. Required SLFD Specialty Patient Forms:</label>
+            <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 12px; font-family: var(--font-mono);">
+              <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="form_acs" style="width: auto;"><span>Acute Coronary Syndromes Form</span></label>
+              <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="form_cpr" style="width: auto;"><span>Cardiac Arrest / Resuscitation Form</span></label>
+              <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="form_airway" style="width: auto;"><span>Advanced Airway Verification Form</span></label>
+            </div>
+          </div>
+
+          <button type="button" class="btn-primary" style="margin-top: 8px; padding: 14px;" onclick="lockDiagnosisAndProceed()">
+            Lock Diagnosis & Build Treatment Plan &rarr;
+          </button>
+        </div>
+
+        <!-- PHASE 4 -->
+        <div id="phase-3" class="hidden card" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #fff;">Sequential Treatment Order Builder</h3>
+              <p style="font-size: 12px; color: #94a3b8;">Configure each intervention from scratch. Nothing is pre-selected.</p>
+            </div>
+            <span class="badge-gold">0 Presets Active</span>
+          </div>
+
+          <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <div>
+                <label style="display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px;">Intervention Category:</label>
+                <select id="order_category" onchange="updateOrderBuilderFields()">
+                  <option value="">-- Select Intervention Category --</option>
+                  <option value="pad_placement">Pad Placement Vector</option>
+                  <option value="medication">Medication Administration</option>
+                  <option value="electrical">Electrical Therapy (Cardiovert / Defib / Pace)</option>
+                  <option value="access_fluids">Vascular Access & Fluids</option>
+                  <option value="consult">Medical Control Consult (Alerts / OLMC)</option>
+                </select>
+              </div>
+              <div id="dynamicOrderFields" style="display: flex; flex-direction: column; justify-content: center;">
+                <span style="font-size: 12px; color: #64748b; font-style: italic;">// Select a category to display parameters...</span>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; border-top: 1px solid #1e293b; padding-top: 12px;">
+              <button type="button" class="btn-action-gold" style="width: auto;" onclick="addInterventionToQueue()">+ Add Intervention to Plan</button>
+            </div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px;">Active Chronological Treatment Sequence:</label>
+            <div id="orderQueueContainer" class="order-queue-box">
+              <div style="color: #64748b; font-style: italic; text-align: center; padding: 32px 0; font-size: 12px;">No treatments queued. Configure interventions above and add them in the exact order.</div>
+            </div>
+          </div>
+
+          <button type="button" class="btn-danger" style="margin-top: 12px;" onclick="executeTreatmentPlan()">
+            ⚡ Execute Treatment Plan & Observe Patient Consequence
+          </button>
+        </div>
+
+        <!-- PHASE 5 -->
+        <div id="phase-4" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
+          <div id="cqiBanner" style="padding: 16px; border-radius: 8px; text-align: center; font-weight: 800; font-family: var(--font-mono); font-size: 15px;"></div>
+          <div class="card" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Cognitive Formulation Audit vs SLFD Benchmark</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; font-size: 13px;">
+              <div style="background-color: var(--card-inner); padding: 16px; border-radius: 6px; border: 1px solid var(--border-dark);">
+                <div style="color: #94a3b8; font-weight: bold; margin-bottom: 8px;">Trainee Initial Submissions:</div>
+                <div id="audit_trainee_cog" class="font-mono-code" style="color: #cbd5e1; line-height: 1.5;"></div>
+              </div>
+              <div style="background-color: var(--card-inner); padding: 16px; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.4);">
+                <div style="color: #60a5fa; font-weight: bold; margin-bottom: 8px;">SLFD Protocol Expectation:</div>
+                <div id="audit_expert_cog" class="font-mono-code" style="color: #cbd5e1; line-height: 1.5;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+            <div class="card" style="border-color: rgba(16, 185, 129, 0.3);">
+              <div style="font-size: 13px; font-weight: 800; color: #34d399; text-transform: uppercase; margin-bottom: 10px;">Plus (+) - Guideline Adherence</div>
+              <ul id="cqiPlusList" style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-family: var(--font-mono);"></ul>
+            </div>
+            <div class="card" style="border-color: rgba(220, 38, 38, 0.3);">
+              <div style="font-size: 13px; font-weight: 800; color: #f87171; text-transform: uppercase; margin-bottom: 10px;">Delta (&Delta;) - Remediations & Deviations</div>
+              <ul id="cqiDeltaList" style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-family: var(--font-mono);"></ul>
+            </div>
+          </div>
+
+          <div id="justCultureBox" class="hidden card" style="background-color: rgba(69, 10, 10, 0.6); border-color: var(--slfd-red);">
+            <div style="font-size: 13px; font-weight: 800; color: #fca5a5; text-transform: uppercase; margin-bottom: 10px;">⚠️ Level 3/4 Event: SLFD Just Culture Error Reporting Chain</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; font-size: 11px; font-family: var(--font-mono); text-align: center;">
+              <div style="background-color: rgba(127, 29, 29, 0.5); padding: 8px 4px; border-radius: 4px; border: 1px solid #991b1b;">1. Recognize Error</div>
+              <div style="background-color: rgba(127, 29, 29, 0.5); padding: 8px 4px; border-radius: 4px; border: 1px solid #991b1b;">2. Manage Patient</div>
+              <div style="background-color: rgba(127, 29, 29, 0.5); padding: 8px 4px; border-radius: 4px; border: 1px solid #991b1b;">3. Contact Capt/BC</div>
+              <div style="background-color: rgba(127, 29, 29, 0.5); padding: 8px 4px; border-radius: 4px; border: 1px solid #991b1b;">4. Notify Hospital</div>
+              <div style="background-color: rgba(127, 29, 29, 0.5); padding: 8px 4px; border-radius: 4px; border: 1px solid #991b1b;">5. Submit Form</div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <button type="button" class="btn-header" style="padding: 12px 24px;" onclick="resetCurrentCase()">↻ Retry Incident</button>
+            <button type="button" class="btn-primary" style="padding: 12px 24px;" onclick="cycleScenario()">Proceed to Next Incident &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="ecgModal" class="modal-overlay hidden">
+    <div class="modal-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="badge-red" style="font-size: 13px;">DIAGNOSTIC 12-LEAD</span>
+          <span style="font-size: 13px; color: #94a3b8; font-family: var(--font-mono);">25 mm/s | 10 mm/mV | Standard Calibration</span>
+        </div>
+        <button type="button" onclick="close12LeadModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; padding: 0 8px;">&times;</button>
+      </div>
+      <div class="ecg-paper-bg"><canvas id="ecg12LeadCanvas" width="900" height="340" style="display: block; margin: 0 auto;"></canvas></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+        <span style="color: #94a3b8; font-style: italic;">Inspect rhythm, contiguous lead ST-deviations, and reciprocal changes.</span>
+        <button type="button" class="btn-primary" onclick="close12LeadModal()">Close Tracing & Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentCaseIdx = 0;
+    let sceneSeconds = 0;
+    let timerInterval = null;
+    let revealedVitals = false;
+    let loggedFindings = [];
+    let currentTreatmentPlan = [];
+    let animOffset = 0;
+    let isSimRunning = false;
+    let isEcgActive = false; 
+
+    // --- CASE POOL DATA DEFINITIONS ---
+    const casePool = [
+      {
+        id: "2027-041",
+        cad: "Medic 1 dispatched Priority 1 to a 45-year-old female complaining of sudden onset palpitations, lightheadedness, and feeling faint.",
+        doorway: "Patient is seated on the floor, pale, and visibly diaphoretic. Altered level of consciousness. Radial pulse feels extremely rapid, weak, and thready.",
+        initialVitals: { hr: 190, bp: "70/40", spo2: "92%", etco2: "30", rr: "24", bgl: "105" },
+        postTxVitals: { hr: 85, bp: "115/75", spo2: "97%", etco2: "38", rr: "16", bgl: "105" },
+        rhythmType: "svt", trueDx: "svt_unstable", dxName: "Unstable Narrow Complex Tachycardia (SVT)",
+        expertCognition: {
+          q1: "Hemodynamically unstable narrow tachycardia (hypotension SBP < 90, hypoperfusion, ALOC). High risk of cardiogenic shock collapse.",
+          q2: "Apply AL pads, prepare for immediate 200J synchronized cardioversion. Pre-sedate with Versed or Fentanyl if possible without delaying electricity."
+        },
+        correctOrders: [
+          { type: "pad_placement", vector: "al" },
+          { type: "electrical", therapy: "sync_cardio", joules: 200, sync: true }
+        ],
+        fatalPitfalls: [
+          { type: "medication", med: "diltiazem", reason: "Diltiazem strictly contraindicated in hypotensive SVT (SBP < 100). Causes immediate cardiovascular collapse." },
+          { type: "medication", med: "adenosine", reason: "Adenosine delays life-saving electrical therapy in a decompensating, unstable patient." }
+        ],
+        requiredForms: ["form_acs"]
+      },
+      {
+        id: "2027-088",
+        cad: "Engine 2 & Medic 2 responding to a 28-year-old male with a sudden racing heart while sitting at his desk.",
+        doorway: "Patient is alert and anxious. Skin is warm and dry. Complains of palpitations but denies chest pain or shortness of breath.",
+        initialVitals: { hr: 185, bp: "125/80", spo2: "99%", etco2: "40", rr: "18", bgl: "110" },
+        postTxVitals: { hr: 90, bp: "120/75", spo2: "99%", etco2: "38", rr: "16", bgl: "110" },
+        rhythmType: "wpw", trueDx: "svt_wpw", dxName: "Stable Narrow Tachycardia with Suspected WPW",
+        expertCognition: {
+          q1: "Stable tachycardia. Adequate perfusion maintained. Potential underlying pre-excitation syndrome.",
+          q2: "Acquire 12-lead to identify delta waves. Treat suspected WPW with Amiodarone. Strictly avoid AV nodal blockers."
+        },
+        correctOrders: [
+          { type: "medication", med: "amiodarone", minDose: 150, maxDose: 150 }
+        ],
+        fatalPitfalls: [
+          { type: "medication", med: "diltiazem", reason: "AV nodal blockers are strictly contraindicated in WPW and can trigger lethal ventricular dysrhythmias." },
+          { type: "medication", med: "adenosine", reason: "Adenosine is an AV nodal blocker contraindicated in suspected WPW." }
+        ],
+        requiredForms: ["form_acs"]
+      },
+      {
+        id: "2027-114",
+        cad: "Medic 3 dispatched Priority 1 to a 60-year-old male complaining of crushing chest pain and severe nausea.",
+        doorway: "Patient is gray, diaphoretic, and clutching his chest. Leaning forward in distress.",
+        initialVitals: { hr: 55, bp: "90/60", spo2: "94%", etco2: "35", rr: "20", bgl: "120" },
+        postTxVitals: { hr: 65, bp: "105/70", spo2: "97%", etco2: "38", rr: "18", bgl: "120" },
+        rhythmType: "inferior_stemi", trueDx: "stemi_inferior_rv", dxName: "Acute Inferior STEMI with Right Ventricular Infarct",
+        expertCognition: {
+          q1: "Acute Coronary Syndrome (ACS) with likely Right Coronary Artery (RCA) occlusion causing inferior wall ischemia and bradycardia.",
+          q2: "Acquire 12-lead & Aspirin 324mg within 5 min. Must run right-sided V4R. Withhold Nitroglycerin in Right Sided MI."
+        },
+        correctOrders: [
+          { type: "medication", med: "aspirin", minDose: 324, maxDose: 324 },
+          { type: "access_fluids", fluid: "ns_bolus" },
+          { type: "consult", consult: "stemi_alert" }
+        ],
+        fatalPitfalls: [
+          { type: "medication", med: "nitro", reason: "Nitroglycerin obliterates preload in Right Ventricular Infarcts, immediately crashing blood pressure!" }
+        ],
+        requiredForms: ["form_acs"]
+      },
+      {
+        id: "2027-152",
+        cad: "Medic 4 dispatched to a 75-year-old female who had a syncopal episode, now conscious but extremely weak.",
+        doorway: "Patient is supine on the floor, lethargic. Extremities are mottled. Very slow, faint radial pulse.",
+        initialVitals: { hr: 32, bp: "76/40", spo2: "90%", etco2: "28", rr: "14", bgl: "115" },
+        postTxVitals: { hr: 70, bp: "110/65", spo2: "96%", etco2: "35", rr: "16", bgl: "115" },
+        rhythmType: "chb", trueDx: "chb_brady", dxName: "Symptomatic Bradycardia (3rd Degree Complete Heart Block)",
+        expertCognition: {
+          q1: "Symptomatic high-degree bradycardia resulting in cardiogenic shock (hypotension, ALOC, syncope).",
+          q2: "Avoid Atropine in high-degree AV blocks. Apply anterior/lateral pads and initiate Transcutaneous Pacing (TCP) without delay."
+        },
+        correctOrders: [
+          { type: "pad_placement", vector: "al" },
+          { type: "electrical", therapy: "pacing", minRate: 60, maxRate: 80, minMa: 40 }
+        ],
+        fatalPitfalls: [
+          { type: "medication", med: "atropine", reason: "Atropine is ineffective and contraindicated in infranodal 3rd-Degree AV blocks per SLFD COGs." }
+        ],
+        requiredForms: ["form_acs"]
+      },
+      {
+        id: "2027-203",
+        cad: "Medic 1 & Engine 1 dispatched to a 55-year-old male sudden collapse at a gym. Bystander CPR in progress.",
+        doorway: "Adult male supine on gym floor. Bystanders performing compressions. Patient is apneic, pulseless, cyanotic.",
+        initialVitals: { hr: 0, bp: "---/---", spo2: "---", etco2: "15", rr: "0", bgl: "---" },
+        postTxVitals: { hr: 95, bp: "120/75", spo2: "96%", etco2: "40", rr: "12", bgl: "140" },
+        rhythmType: "vfib", trueDx: "refractory_vf", dxName: "Refractory Pulseless V-Fib / Cardiac Arrest",
+        expertCognition: {
+          q1: "Pulseless shockable cardiac arrest. Maximize Chest Compression Fraction (CCF).",
+          q2: "Use AP pads, early defibrillation (360J), Epinephrine 1mg followed by infusion, and Amiodarone 300mg."
+        },
+        correctOrders: [
+          { type: "pad_placement", vector: "ap" },
+          { type: "electrical", therapy: "defib", joules: 360 },
+          { type: "medication", med: "amiodarone", minDose: 300, maxDose: 300 }
+        ],
+        fatalPitfalls: [
+          { type: "medication", med: "diltiazem", reason: "Administering calcium-channel blockers in cardiac arrest is a Level 4 Sentinel error." }
+        ],
+        requiredForms: ["form_cpr"]
+      }
+    ];
+
+    const drugCatalog = [
+      { id: "adenosine", name: "Adenosine (Adenocard)" }, { id: "amiodarone", name: "Amiodarone (Cordarone)" },
+      { id: "aspirin", name: "Aspirin (ASA)" }, { id: "atropine", name: "Atropine Sulfate" },
+      { id: "calcium_chloride", name: "Calcium Chloride 10%" }, { id: "diltiazem", name: "Diltiazem (Cardizem)" },
+      { id: "epinephrine_1_10000", name: "Epinephrine 1:10,000" }, { id: "epinephrine_drip", name: "Epinephrine Infusion (Drip)" },
+      { id: "fentanyl", name: "Fentanyl (Sublimaze)" }, { id: "ketamine", name: "Ketamine (Ketalar)" },
+      { id: "lidocaine", name: "Lidocaine 2%" }, { id: "versed", name: "Midazolam (Versed)" },
+      { id: "nitro", name: "Nitroglycerin (SL / Spray)" }, { id: "norepi", name: "Norepinephrine (Levophed)" },
+      { id: "sodium_bicarb", name: "Sodium Bicarbonate 8.4%" }
+    ];
+
+    const assessmentList = [
+      { id: "a_monitor", label: "Apply 4-Lead Cardiac Monitor", time: 15, icon: "🔌" },
+      { id: "a_bp", label: "Palpate Manual NIBP", time: 20, icon: "🩺" },
+      { id: "a_12lead", label: "Acquire 12-Lead ECG", time: 45, icon: "📈", is12Lead: true },
+      { id: "a_lungs", label: "Auscultate Breath Sounds", time: 15, icon: "🫁" },
+      { id: "a_pulses", label: "Palpate Pulses & Cap Refill", time: 10, icon: "⏱️" },
+      { id: "a_pocus", label: "Bedside Cardiac POCUS", time: 40, icon: "📟" },
+      { id: "a_v4r", label: "Acquire Right-Sided V4R", time: 30, icon: "⚡" },
+      { id: "a_bgl", label: "Check Blood Glucose (BGL)", time: 15, icon: "🩸" }
+    ];
+
+    const ruleOutOptions = [
+      { id: "ro_narrow", text: "Narrow QRS duration (< 120 ms) confirms supraventricular origin without bundle delay." },
+      { id: "ro_wide_reg", text: "Wide bizarre QRS (> 160 ms) without P-waves indicates ventricular ectopic focus." },
+      { id: "ro_v4r_ste", text: "Right-sided lead V4R demonstrates ≥ 1.0 mm ST-segment elevation, confirming Right Ventricular involvement." },
+      { id: "ro_recip", text: "Contiguous ST elevation in II, III, aVF with reciprocal ST depression in I and aVL localizes acute injury." },
+      { id: "ro_chb_dissoc", text: "Complete P-wave and QRS dissociation with ventricular rate < 40 bpm confirms 3rd-Degree AV Block." },
+      { id: "ro_hypotension", text: "Decompensated SBP < 90 mmHg and diaphoresis confirms unstable hypoperfusion status." },
+      { id: "ro_wpw_delta", text: "Presence of delta waves and shortened PR interval indicates pre-excitation (WPW)." }
+    ];
+
+    function startSimulation() {
+      const overlay = document.getElementById('startOverlay');
+      if (overlay) overlay.classList.add('hidden');
+      isSimRunning = true;
+      startClock();
+    }
+
+    function startClock() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(function() {
+        if (!isSimRunning) return;
+        sceneSeconds++;
+        updateClockDisplay();
+      }, 1000);
+    }
+
+    function updateClockDisplay() {
+      const mins = Math.floor(sceneSeconds / 60).toString().padStart(2, '0');
+      const secs = (sceneSeconds % 60).toString().padStart(2, '0');
+      const clockEl = document.getElementById('sceneClock');
+      if (clockEl) clockEl.innerText = mins + ":" + secs;
+      const targetEl = document.getElementById('targetBadge');
+      if (targetEl) {
+        if (sceneSeconds > 300) {
+          targetEl.style.backgroundColor = "#7f1d1d";
+          targetEl.style.color = "#fca5a5";
+          targetEl.innerText = "12-LEAD BENCHMARK EXCEEDED (> 05:00)";
+        } else {
+          targetEl.style.backgroundColor = "#1e3a8a";
+          targetEl.style.color = "#93c5fd";
+          targetEl.innerText = "12-LEAD TARGET: ≤ 05:00";
+        }
+      }
+    }
+
+    function cycleScenario() {
+      currentCaseIdx = (currentCaseIdx + 1) % casePool.length;
+      loadCase(currentCaseIdx);
+    }
+
+    function resetCurrentCase() { loadCase(currentCaseIdx); }
+
+    function loadCase(idx) {
+      const c = casePool[idx];
+      document.getElementById('activeCaseBadge').innerText = "INCIDENT #" + c.id;
+      document.getElementById('cadDispatchId').innerText = "CAD INCIDENT: #" + c.id;
+      document.getElementById('cadDispatchText').innerText = c.cad;
+      document.getElementById('doorwayImpressionText').innerText = c.doorway;
+      document.getElementById('cog_q1').value = "";
+      document.getElementById('cog_q2').value = "";
+      document.getElementById('sel_working_dx').value = "";
+      document.querySelectorAll('#ruleOutChecklist input, #phase-2 input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+      revealedVitals = false;
+      document.getElementById('disp-hr').innerText = "--";
+      document.getElementById('disp-bp').innerText = "--/--";
+      document.getElementById('disp-spo2').innerText = "--%";
+      document.getElementById('disp-etco2').innerText = "--";
+      document.getElementById('disp-rr').innerText = "--";
+      document.getElementById('disp-bgl').innerText = "--";
+      document.getElementById('syncModeIndicator').innerText = "SYNC: OFF";
+      document.getElementById('syncModeIndicator').style.color = "#64748b";
+      
+      isEcgActive = false;
+      const pulseIndicator = document.getElementById('pulseIndicator');
+      if(pulseIndicator) {
+        pulseIndicator.style.backgroundColor = "#64748b";
+        pulseIndicator.style.boxShadow = "none";
+      }
+
+      loggedFindings = [];
+      updateFindingsLogView();
+      currentTreatmentPlan = [];
+      renderOrderQueue();
+      resetOrderBuilder();
+      switchPhaseView(0);
+      sceneSeconds = 0;
+      updateClockDisplay();
+    }
+
+    function switchPhaseView(phaseNum) {
+      for (let i = 0; i <= 4; i++) {
+        const pElem = document.getElementById("phase-" + i);
+        const tabElem = document.getElementById("stepTab-" + i);
+        if (!pElem || !tabElem) continue;
+        if (i === phaseNum) {
+          pElem.classList.remove('hidden');
+          tabElem.className = "tab-btn tab-active";
+        } else {
+          pElem.classList.add('hidden');
+          tabElem.className = i < phaseNum ? "tab-btn tab-unlocked" : "tab-btn tab-locked";
+        }
+      }
+    }
+
+    function submitCognitiveGate() {
+      const q1 = document.getElementById('cog_q1').value.trim();
+      const q2 = document.getElementById('cog_q2').value.trim();
+      if (!q1 || !q2) { alert("Please answer both clinical reasoning questions."); return; }
+      addLogEntry("[COGNITIVE FORMULATION RECORDED] Initial priorities logged.");
+      switchPhaseView(1);
+    }
+
+    function buildAssessmentActionGrid() {
+      const grid = document.getElementById('assessmentActionGrid');
+      if (!grid) return;
+      grid.innerHTML = "";
+      assessmentList.forEach(function(act) {
+        const btn = document.createElement('button');
+        btn.type = "button";
+        btn.className = "assessment-btn";
+        btn.onclick = function() { performAssessment(act); };
+        
+        // TEMPLATE LITERAL REPLACEMENT
+        btn.innerHTML = `
+          <span class="assessment-icon">${act.icon}</span>
+          <div>
+            <div style="font-size: 13px; font-weight: bold; color: #f8fafc;">${act.label}</div>
+            <div style="font-size: 11px; color: #64748b; font-family: var(--font-mono); margin-top: 4px;">+${act.time}s scene time</div>
+          </div>
+        `;
+        grid.appendChild(btn);
+      });
+    }
+
+    function performAssessment(act) {
+      sceneSeconds += act.time;
+      updateClockDisplay();
+      const c = casePool[currentCaseIdx];
+
+      if (act.id === "a_monitor" || act.is12Lead) {
+        isEcgActive = true;
+        const dot = document.getElementById('pulseIndicator');
+        if (dot) {
+          dot.style.backgroundColor = "#10b981";
+          dot.style.boxShadow = "0 0 10px #10b981";
+        }
+        if (act.id === "a_monitor") addLogEntry("[CARDIAC MONITOR] 4-Lead limb cable attached; telemetry active.");
+      }
+
+      if (act.is12Lead) {
+        open12LeadModal();
+        addLogEntry(`[12-LEAD ECG ACQUIRED] Diagnostic tracing opened for inspection at ${formatTime(sceneSeconds)}.`);
+        revealCaseVitals();
+        return;
+      }
+
+      if (act.id === "a_bp") {
+        document.getElementById('disp-bp').innerText = c.initialVitals.bp;
+        addLogEntry(`[NIBP PALPATED] Blood pressure measured at ${c.initialVitals.bp} mmHg.`);
+      } else if (act.id === "a_lungs") {
+        addLogEntry("[BREATH SOUNDS] Clear to auscultation bilaterally in all fields. No wheezing or rales.");
+      } else if (act.id === "a_pocus") {
+        addLogEntry("[CARDIAC POCUS] Parasternal long axis: Hyperdynamic LV, collapsible IVC, no pericardial fluid.");
+      } else if (act.id === "a_v4r") {
+        const v4rText = (c.trueDx === "stemi_inferior_rv") ? "Right-sided V4R reveals +1.5 mm ST-segment ELEVATION (Right Ventricular Infarct Confirmed)." : "V4R flat; no ST elevation noted in right-sided leads.";
+        addLogEntry(`[V4R RIGHT-SIDED LEAD] ${v4rText}`);
+      } else if (act.id === "a_bgl") {
+        document.getElementById('disp-bgl').innerText = c.initialVitals.bgl;
+        addLogEntry(`[GLUCOMETRY] BGL verified at ${c.initialVitals.bgl} mg/dL.`);
+      } else if (act.id === "a_pulses") {
+        addLogEntry("[PERIPHERAL PULSE] Radial pulse corresponds to monitor findings. Cap refill 3.5s.");
+      }
+      revealCaseVitals();
+    }
+
+    function revealCaseVitals() {
+      if (revealedVitals) return;
+      revealedVitals = true;
+      const c = casePool[currentCaseIdx];
+      document.getElementById('disp-hr').innerText = c.initialVitals.hr;
+      document.getElementById('disp-bp').innerText = c.initialVitals.bp;
+      document.getElementById('disp-spo2').innerText = c.initialVitals.spo2;
+      document.getElementById('disp-etco2').innerText = c.initialVitals.etco2;
+      document.getElementById('disp-rr').innerText = c.initialVitals.rr;
+      document.getElementById('disp-bgl').innerText = c.initialVitals.bgl;
+    }
+
+    function proceedToRuleOut() { switchPhaseView(2); }
+
+    function buildRuleOutChecklist() {
+      const container = document.getElementById('ruleOutChecklist');
+      if (!container) return;
+      container.innerHTML = "";
+      ruleOutOptions.forEach(function(opt) {
+        const label = document.createElement('label');
+        label.style.display = "flex";
+        label.style.alignItems = "flex-start";
+        label.style.gap = "8px";
+        label.style.cursor = "pointer";
+        
+        // TEMPLATE LITERAL REPLACEMENT
+        label.innerHTML = `
+          <input type="checkbox" id="${opt.id}" style="margin-top: 3px; width: 16px; height: 16px;">
+          <span style="font-size: 13px; line-height: 1.4; color: #cbd5e1;">${opt.text}</span>
+        `;
+        container.appendChild(label);
+      });
+    }
+
+    function lockDiagnosisAndProceed() {
+      const workingDx = document.getElementById('sel_working_dx').value;
+      if (!workingDx) { alert("Please select your primary working diagnosis."); return; }
+      addLogEntry("[DIAGNOSIS LOCKED] Trainee confirmed primary impression.");
+      switchPhaseView(3);
+    }
+
+    function resetOrderBuilder() {
+      const catEl = document.getElementById('order_category');
+      if (catEl) catEl.value = "";
+      const dynEl = document.getElementById('dynamicOrderFields');
+      if (dynEl) dynEl.innerHTML = `<span style="font-size: 12px; color: #64748b; font-style: italic;">// Select a category to display parameters...</span>`;
+    }
+
+    function updateOrderBuilderFields() {
+      const cat = document.getElementById('order_category').value;
+      const container = document.getElementById('dynamicOrderFields');
+      if (!container) return;
+      container.innerHTML = "";
+      
+      if (!cat) {
+        container.innerHTML = `<span style="font-size: 12px; color: #64748b; font-style: italic;">// Select a category to display parameters...</span>`;
+        return;
+      }
+
+      // TEMPLATE LITERAL REPLACEMENTS FOR ALL FORMS
+      if (cat === "medication") {
+        let optionsHtml = `<option value="">-- Select Medication --</option>`;
+        drugCatalog.forEach(function(d) { optionsHtml += `<option value="${d.id}">${d.name}</option>`; });
+        container.innerHTML = `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="grid-column: span 2;">
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Drug Name:</label>
+              <select id="ord_med_name">${optionsHtml}</select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Dose (Number Only):</label>
+              <input type="number" id="ord_med_dose" step="any" placeholder="Enter dose">
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Unit:</label>
+              <select id="ord_med_unit">
+                <option value="">-- Unit --</option>
+                <option value="mg">mg</option>
+                <option value="mcg">mcg</option>
+                <option value="mcg/min">mcg/min</option>
+                <option value="g">g</option>
+                <option value="mEq">mEq</option>
+              </select>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Route:</label>
+              <select id="ord_med_route">
+                <option value="">-- Select Route --</option>
+                <option value="IV/IO">IV / IO Push</option>
+                <option value="IV Infusion">IV Infusion (Drip / Pump)</option>
+                <option value="IM">Intramuscular (IM)</option>
+                <option value="PO">Oral (PO / Chewable)</option>
+              </select>
+            </div>
+          </div>`;
+      } else if (cat === "electrical") {
+        container.innerHTML = `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="grid-column: span 2;">
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Electrical Modality:</label>
+              <select id="ord_elec_type">
+                <option value="">-- Select Therapy Modality --</option>
+                <option value="sync_cardio">Synchronized Cardioversion</option>
+                <option value="defib">Unsynchronized Defibrillation</option>
+                <option value="pacing">Transcutaneous Pacing (TCP)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Energy (Joules):</label>
+              <input type="number" id="ord_elec_joules" placeholder="Joules">
+            </div>
+            <div style="display: flex; align-items: center; padding-top: 18px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e2e8f0; cursor: pointer;">
+                <input type="checkbox" id="ord_elec_sync" style="width: auto;">
+                <span>ARM Sync Mode</span>
+              </label>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">TCP Rate (PPM):</label>
+              <input type="number" id="ord_elec_rate" placeholder="ppm (e.g. 70)">
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">TCP Current (mA):</label>
+              <input type="number" id="ord_elec_ma" placeholder="mA capture">
+            </div>
+          </div>`;
+      } else if (cat === "pad_placement") {
+        container.innerHTML = `
+          <div>
+            <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Prescribed Pad Placement Vector:</label>
+            <select id="ord_pad_vector">
+              <option value="">-- Select Pad Vector --</option>
+              <option value="al">Anterior / Lateral (AL) - Right Infraclavicular & Left Mid-Axillary</option>
+              <option value="ap">Anterior / Posterior (AP) - Left Precordial & Left Infrascapular</option>
+            </select>
+          </div>`;
+      } else if (cat === "access_fluids") {
+        container.innerHTML = `
+          <div>
+            <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Fluid Bolus / Line:</label>
+            <select id="ord_fluid">
+              <option value="">-- Select Fluid / Access --</option>
+              <option value="ns_bolus">Normal Saline (250 - 500 mL IV/IO Bolus)</option>
+              <option value="ns_tkvo">Normal Saline TKO / Saline Lock</option>
+              <option value="io_humeral">Proximal Humeral Head Intraosseous (IO) Access</option>
+            </select>
+          </div>`;
+      } else if (cat === "consult") {
+        container.innerHTML = `
+          <div>
+            <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Consultation / Alert:</label>
+            <select id="ord_consult">
+              <option value="">-- Select Communication Protocol --</option>
+              <option value="stemi_alert">Radio "STEMI Alert" to PCI Receiving Facility</option>
+              <option value="olmc_captain">Consult On-Line Medical Control (Operations Captain)</option>
+            </select>
+          </div>`;
+      }
+    }
+
+    function addInterventionToQueue() {
+      const cat = document.getElementById('order_category').value;
+      if (!cat) { alert("Select an intervention category first."); return; }
+      let orderItem = { id: Date.now(), category: cat };
+
+      if (cat === "medication") {
+        const med = document.getElementById('ord_med_name').value;
+        const dose = parseFloat(document.getElementById('ord_med_dose').value);
+        const unit = document.getElementById('ord_med_unit').value;
+        const route = document.getElementById('ord_med_route').value;
+        if (!med || isNaN(dose) || !unit || !route) { alert("All medication fields are mandatory!"); return; }
+        orderItem.med = med; orderItem.dose = dose; orderItem.unit = unit; orderItem.route = route;
+        const medObj = drugCatalog.find(function(d) { return d.id === med; });
+        orderItem.summary = `Medication: ${medObj ? medObj.name : med} ${dose} ${unit} via ${route}`;
+      } else if (cat === "electrical") {
+        const type = document.getElementById('ord_elec_type').value;
+        const joules = parseInt(document.getElementById('ord_elec_joules').value) || 0;
+        const sync = document.getElementById('ord_elec_sync').checked;
+        const rate = parseInt(document.getElementById('ord_elec_rate').value) || 0;
+        const ma = parseInt(document.getElementById('ord_elec_ma').value) || 0;
+        if (!type) { alert("Select electrical modality."); return; }
+        orderItem.therapy = type; orderItem.joules = joules; orderItem.sync = sync; orderItem.rate = rate; orderItem.ma = ma;
+        
+        let summary = `Electrical: ${type.toUpperCase()} `;
+        if (type === "pacing") summary += `@ ${rate} ppm, ${ma} mA`; 
+        else summary += `${joules}J (Sync: ${sync ? 'ARMED' : 'OFF'})`;
+        orderItem.summary = summary;
+      } else if (cat === "pad_placement") {
+        const vec = document.getElementById('ord_pad_vector').value;
+        if (!vec) { alert("Select pad vector."); return; }
+        orderItem.vector = vec; orderItem.summary = `Pad Placement: Vector ${vec.toUpperCase()}`;
+      } else if (cat === "access_fluids") {
+        const fl = document.getElementById('ord_fluid').value;
+        if (!fl) { alert("Select fluid or access type."); return; }
+        orderItem.fluid = fl; orderItem.summary = `Vascular / Fluid: ${fl.replace('_', ' ').toUpperCase()}`;
+      } else if (cat === "consult") {
+        const con = document.getElementById('ord_consult').value;
+        if (!con) { alert("Select consultation type."); return; }
+        orderItem.consult = con; orderItem.summary = `Communication: ${con.replace(/_/g, ' ').toUpperCase()}`;
+      }
+
+      currentTreatmentPlan.push(orderItem);
+      renderOrderQueue();
+      resetOrderBuilder();
+    }
+
+    function renderOrderQueue() {
+      const container = document.getElementById('orderQueueContainer');
+      if (!container) return;
+      container.innerHTML = "";
+      
+      if (currentTreatmentPlan.length === 0) {
+        container.innerHTML = `<div style="color: #64748b; font-style: italic; text-align: center; padding: 32px 0; font-size: 12px;">No treatments queued.</div>`;
+        return;
+      }
+      
+      currentTreatmentPlan.forEach(function(ord, index) {
+        const row = document.createElement('div');
+        row.className = "order-row";
+        
+        // TEMPLATE LITERAL REPLACEMENT
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="order-index">${index + 1}</span>
+            <span>${ord.summary}</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" onclick="moveOrder(${index}, -1)" class="btn-sm-ctrl" ${index === 0 ? 'disabled' : ''}>▲</button>
+            <button type="button" onclick="moveOrder(${index}, 1)" class="btn-sm-ctrl" ${index === currentTreatmentPlan.length - 1 ? 'disabled' : ''}>▼</button>
+            <button type="button" onclick="deleteOrder(${index})" class="btn-sm-del">✕</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function moveOrder(idx, delta) {
+      const target = idx + delta;
+      if (target < 0 || target >= currentTreatmentPlan.length) return;
+      const temp = currentTreatmentPlan[idx];
+      currentTreatmentPlan[idx] = currentTreatmentPlan[target];
+      currentTreatmentPlan[target] = temp;
+      renderOrderQueue();
+    }
+
+    function deleteOrder(idx) { currentTreatmentPlan.splice(idx, 1); renderOrderQueue(); }
+
+    function executeTreatmentPlan() {
+      if (currentTreatmentPlan.length === 0) { alert("Cannot execute empty plan! Build at least one treatment step."); return; }
+      const c = casePool[currentCaseIdx];
+      let plusList = [], deltaList = [], hasSentinelEvent = false;
+
+      const selectedDx = document.getElementById('sel_working_dx').value;
+      if (selectedDx === c.trueDx) plusList.push(`Accurate Primary Working Diagnosis: Identified ${c.dxName}.`);
+      else deltaList.push(`Diagnostic Misclassification: Selected "${selectedDx || 'None'}" instead of ${c.dxName}.`);
+
+      c.requiredForms.forEach(function(reqForm) {
+        if (document.getElementById(reqForm).checked) plusList.push(`Specialty Patient Form Compliance: Correctly documented ${reqForm.replace('form_', '').toUpperCase()} form.`);
+        else deltaList.push(`Level 1 Documentation Error: Omitted mandatory SLFD Specialty Patient Form (${reqForm.replace('form_', '').toUpperCase()}).`);
+      });
+
+      c.fatalPitfalls.forEach(function(pitfall) {
+        const found = currentTreatmentPlan.find(function(ord) { return ord.category === pitfall.type && ord.med === pitfall.med; });
+        if (found) {
+          hasSentinelEvent = true;
+          deltaList.push(`LEVEL 3/4 CLINICAL SAFETY EVENT: ${pitfall.reason}`);
+          document.getElementById('disp-bp').innerText = "54/28";
+          document.getElementById('disp-hr').innerText = "180";
+          document.getElementById('disp-spo2').innerText = "82%";
+          addLogEntry("[PHYSIOLOGICAL COLLAPSE] Patient crashed following contraindicated administration! BP 54/28.");
+        }
+      });
+
+      c.correctOrders.forEach(function(reqOrd) {
+        if (reqOrd.type === "pad_placement") {
+          const match = currentTreatmentPlan.find(function(o) { return o.category === "pad_placement" && o.vector === reqOrd.vector; });
+          if (match) plusList.push(`Pad Placement: Correct vector selected (${reqOrd.vector.toUpperCase()}).`);
+          else deltaList.push(`Level 2 Guideline Deviation: Pad placement was either omitted or incorrect vector used (Expected: ${reqOrd.vector.toUpperCase()}).`);
+        } else if (reqOrd.type === "medication") {
+          const match = currentTreatmentPlan.find(function(o) { return o.category === "medication" && o.med === reqOrd.med; });
+          if (match) {
+            if (match.dose >= reqOrd.minDose && match.dose <= reqOrd.maxDose) plusList.push(`Pharmacology: Correct dosage of ${match.med.toUpperCase()} (${match.dose} ${match.unit}) administered.`);
+            else deltaList.push(`Level 2 Medication Error: ${match.med.toUpperCase()} dose of ${match.dose} ${match.unit} deviated from protocol range (${reqOrd.minDose} - ${reqOrd.maxDose}).`);
+          } else deltaList.push(`Protocol Omission: Mandatory medication (${reqOrd.med.toUpperCase()}) was not administered.`);
+        } else if (reqOrd.type === "electrical") {
+          const match = currentTreatmentPlan.find(function(o) { return o.category === "electrical" && o.therapy === reqOrd.therapy; });
+          if (match) {
+            if (reqOrd.sync !== undefined && match.sync !== reqOrd.sync) deltaList.push(`CRITICAL ELECTRICAL HAZARD: Synchronizer mode was not properly ${reqOrd.sync ? 'ARMED' : 'DISARMED'}! Risk of R-on-T induced V-Fib.`);
+            else plusList.push(`Electrical Therapy: Correct modality (${reqOrd.therapy}) executed.`);
+            if (reqOrd.joules && match.joules !== reqOrd.joules) deltaList.push(`Energy Selection Deviation: Selected ${match.joules}J instead of standard ${reqOrd.joules}J.`);
+          } else deltaList.push(`Electrical Therapy Omission: Required modality (${reqOrd.therapy}) was not administered.`);
+        }
+      });
+
+      const shockIdx = currentTreatmentPlan.findIndex(function(o) { return o.category === "electrical" && (o.therapy === "sync_cardio" || o.therapy === "pacing"); });
+      const sedIdx = currentTreatmentPlan.findIndex(function(o) { return o.category === "medication" && (o.med === "versed" || o.med === "fentanyl" || o.med === "ketamine"); });
+      if (shockIdx !== -1 && sedIdx !== -1) {
+        if (sedIdx < shockIdx) plusList.push("Procedural Sequencing: Pre-sedation analgesia administered prior to painful electrical delivery.");
+        else deltaList.push("Sequencing Failure: Delivered electrical therapy prior to providing sedation in conscious patient.");
+      }
+
+      if (!hasSentinelEvent && selectedDx === c.trueDx) {
+        document.getElementById('disp-hr').innerText = c.postTxVitals.hr;
+        document.getElementById('disp-bp').innerText = c.postTxVitals.bp;
+        document.getElementById('disp-spo2').innerText = c.postTxVitals.spo2;
+        document.getElementById('disp-etco2').innerText = c.postTxVitals.etco2;
+        document.getElementById('disp-rr').innerText = c.postTxVitals.rr;
+        addLogEntry(`[TREATMENT RESPONSE] Patient hemodynamics successfully stabilized. Post-intervention BP ${c.postTxVitals.bp}.`);
+      }
+
+      displayDebrief(plusList, deltaList, hasSentinelEvent);
+      switchPhaseView(4);
+    }
+
+    function displayDebrief(plusList, deltaList, hasSentinel) {
+      const banner = document.getElementById('cqiBanner');
+      const plusUl = document.getElementById('cqiPlusList');
+      const deltaUl = document.getElementById('cqiDeltaList');
+      const c = casePool[currentCaseIdx];
+
+      document.getElementById('audit_trainee_cog').innerHTML = `<strong>Q1:</strong> ${document.getElementById('cog_q1').value}<br><br><strong>Q2:</strong> ${document.getElementById('cog_q2').value}`;
+      document.getElementById('audit_expert_cog').innerHTML = `<strong>Q1:</strong> ${c.expertCognition.q1}<br><br><strong>Q2:</strong> ${c.expertCognition.q2}`;
+
+      plusUl.innerHTML = ""; 
+      plusList.forEach(function(item) { 
+        const li = document.createElement('li'); 
+        li.style.color = "#34d399"; 
+        li.innerHTML = `✓ ${item}`; 
+        plusUl.appendChild(li); 
+      });
+      
+      deltaUl.innerHTML = ""; 
+      deltaList.forEach(function(item) { 
+        const li = document.createElement('li'); 
+        li.style.color = "#f87171"; 
+        li.innerHTML = `✗ ${item}`; 
+        deltaUl.appendChild(li); 
+      });
+
+      const jcBox = document.getElementById('justCultureBox');
+      if (hasSentinel) {
+        banner.style.backgroundColor = "rgba(127, 29, 29, 0.9)"; banner.style.border = "1px solid #dc2626"; banner.style.color = "#fecaca";
+        banner.innerText = "CQI LEVEL 3/4 MAJOR CLINICAL SAFETY DEVIATION";
+        if (jcBox) jcBox.classList.remove('hidden');
+      } else if (deltaList.length === 0) {
+        banner.style.backgroundColor = "rgba(6, 78, 59, 0.9)"; banner.style.border = "1px solid #10b981"; banner.style.color = "#a7f3d0";
+        banner.innerText = "100% CQI PROTOCOL COMPLIANCE - EXCELLENT CLINICAL EXECUTION";
+        if (jcBox) jcBox.classList.add('hidden');
+      } else {
+        banner.style.backgroundColor = "rgba(120, 53, 15, 0.9)"; banner.style.border = "1px solid #f59e0b"; banner.style.color = "#fde68a";
+        banner.innerText = `CQI LEVEL 2 MINOR DEVIATIONS (${deltaList.length} Items for Remediation)`;
+        if (jcBox) jcBox.classList.add('hidden');
+      }
+    }
+
+    function open12LeadModal() { const modal = document.getElementById('ecgModal'); if (modal) modal.classList.remove('hidden'); draw12LeadTracing(); }
+    function close12LeadModal() { const modal = document.getElementById('ecgModal'); if (modal) modal.classList.add('hidden'); }
+
+    function draw12LeadTracing() {
+      const cvs = document.getElementById('ecg12LeadCanvas');
+      if (!cvs) return; const c = cvs.getContext('2d'); if (!c) return;
+      c.clearRect(0, 0, cvs.width, cvs.height);
+      const leads = [ { name: "I", x: 20, y: 35 }, { name: "aVR", x: 250, y: 35 }, { name: "V1", x: 480, y: 35 }, { name: "V4", x: 700, y: 35 }, { name: "II", x: 20, y: 125 }, { name: "aVL", x: 250, y: 125 }, { name: "V2", x: 480, y: 125 }, { name: "V5", x: 700, y: 125 }, { name: "III", x: 20, y: 215 }, { name: "aVF", x: 250, y: 215 }, { name: "V3", x: 480, y: 215 }, { name: "V6", x: 700, y: 215 }, { name: "II (Rhythm)", x: 20, y: 305 } ];
+      c.font = "bold 11px monospace"; c.fillStyle = "#881337";
+      leads.forEach(function(ld) { c.fillText(ld.name, ld.x, ld.y); });
+      c.strokeStyle = "#111827"; c.lineWidth = 1.4; c.beginPath();
+      const rType = casePool[currentCaseIdx].rhythmType;
+      leads.forEach(function(ld, idx) {
+        const startX = ld.x + 35, baselineY = ld.y - 4, width = (idx === 12) ? 820 : 180;
+        for (let px = 0; px < width; px++) {
+          let cycle = px % 60, y = baselineY;
+          if (rType === "svt") {
+            let t = px % 24;
+            if (t > 4 && t < 7) y = baselineY - 2; else if (t === 7) y = baselineY + 2; else if (t === 8) y = baselineY - 26; else if (t === 9) y = baselineY + 6; else if (t > 13 && t < 18) y = baselineY - 4;
+          } else if (rType === "wpw") { 
+            let t = px % 30;
+            if (t > 3 && t < 6) y = baselineY - 2; else if (t >= 6 && t < 10) y = baselineY - (t - 6) * 4; else if (t === 10) y = baselineY - 22; else if (t === 11) y = baselineY + 5; else if (t > 15 && t < 20) y = baselineY - 4; 
+          } else if (rType === "chb") {
+            if (cycle === 10 || cycle === 35) y = baselineY - 4;
+            if (cycle > 45 && cycle < 56) y = baselineY - 14 * Math.sin((cycle - 45) / 11 * Math.PI);
+          } else if (rType === "inferior_stemi") {
+            let isInferior = (ld.name === "II" || ld.name === "III" || ld.name === "aVF" || idx === 12), isReciprocal = (ld.name === "I" || ld.name === "aVL"), t = cycle;
+            if (t > 15 && t < 22) y = baselineY - 3; else if (t === 22) y = baselineY + 2; else if (t === 23) y = baselineY - 24; else if (t === 24) y = baselineY + 5; else if (t > 24 && t < 45) { if (isInferior) y = baselineY - 8; else if (isReciprocal) y = baselineY + 5; else y = baselineY - 3; }
+          } else if (rType === "vfib") y = baselineY + Math.sin(px * 0.22) * 12 + Math.cos(px * 0.38) * 8;
+          if (px === 0) c.moveTo(startX + px, y); else c.lineTo(startX + px, y);
+        }
+      });
+      c.stroke();
+    }
+
+    function sweepLead2Canvas() {
+      const canvas = document.getElementById('liveLead2Canvas');
+      if (!canvas) { requestAnimationFrame(sweepLead2Canvas); return; }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { requestAnimationFrame(sweepLead2Canvas); return; }
+      const cWidth = canvas.width, cHeight = canvas.height;
+      
+      ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, cWidth, cHeight);
+      ctx.strokeStyle = "#064e3b"; ctx.lineWidth = 0.5;
+      
+      for (let x = 0; x < cWidth; x += 15) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cHeight); ctx.stroke(); }
+      for (let y = 0; y < cHeight; y += 15) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cWidth, y); ctx.stroke(); }
+      
+      const mid = cHeight / 2;
+
+      if (!isSimRunning || !isEcgActive) {
+        ctx.strokeStyle = "#475569"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(cWidth, mid); ctx.stroke(); ctx.setLineDash([]); 
+        ctx.font = "bold 12px monospace"; ctx.fillStyle = "#f59e0b"; ctx.textAlign = "center"; ctx.fillText("--- LEADS NOT ATTACHED ---", cWidth / 2, mid - 12); ctx.textAlign = "start";
+        requestAnimationFrame(sweepLead2Canvas); return;
+      }
+      
+      ctx.strokeStyle = "#00ff66"; ctx.lineWidth = 1.6; ctx.beginPath();
+      const rType = casePool[currentCaseIdx].rhythmType;
+      
+      for (let x = 0; x < cWidth; x++) {
+        let y = mid;
+        if (rType === "svt") {
+          let svtT = (x + animOffset) % 30;
+          if (svtT > 4 && svtT < 8) y = mid - 3; else if (svtT === 8) y = mid + 3; else if (svtT === 9) y = mid - 26; else if (svtT === 10) y = mid + 6; else if (svtT > 16 && svtT < 22) y = mid - 5;
+        } else if (rType === "wpw") {
+          let wpwT = (x + animOffset) % 35; 
+          if (wpwT > 3 && wpwT < 6) y = mid - 3; else if (wpwT >= 6 && wpwT < 10) y = mid - (wpwT - 6) * 4; else if (wpwT === 10) y = mid - 24; else if (wpwT === 11) y = mid + 6; else if (wpwT > 16 && wpwT < 22) y = mid - 5;
+        } else if (rType === "chb") {
+          let pCycle = (x + animOffset) % 40, qCycle = (x + animOffset) % 110;
+          if (pCycle > 6 && pCycle < 10) y = mid - 4; if (qCycle > 45 && qCycle < 60) y = mid - 14 * Math.sin((qCycle - 45) / 15 * Math.PI);
+        } else if (rType === "inferior_stemi") {
+          let stT = (x + animOffset) % 75;
+          if (stT > 12 && stT < 18) y = mid - 3; else if (stT === 18) y = mid + 2; else if (stT === 19) y = mid - 24; else if (stT === 20) y = mid + 5; else if (stT > 20 && stT < 42) y = mid - 9;
+        } else if (rType === "vfib") y = mid + Math.sin((x + animOffset) * 0.16) * 14 + Math.cos((x + animOffset) * 0.28) * 8;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke(); animOffset += 2; requestAnimationFrame(sweepLead2Canvas);
+    }
+
+    function addLogEntry(msg) { loggedFindings.unshift({ time: formatTime(sceneSeconds), text: msg }); updateFindingsLogView(); }
+    function updateFindingsLogView() {
+      const container = document.getElementById('findingsLog'), countEl = document.getElementById('findingsCount');
+      if (countEl) countEl.innerText = `${loggedFindings.length} Logged`;
+      if (!container) return;
+      if (loggedFindings.length === 0) { container.innerHTML = `<div style="color: #64748b; font-style: italic; font-size: 12px;">// Uncover physical assessments in Phase 2 to reveal clinical findings...</div>`; return; }
+      
+      // TEMPLATE LITERAL REPLACEMENT
+      container.innerHTML = loggedFindings.map(function(item) { 
+        return `
+          <div class="findings-item">
+            <span style="color: var(--slfd-gold); font-weight: bold;">[${item.time}]</span> 
+            <span style="color: #cbd5e1;">${item.text}</span>
+          </div>
+        `; 
+      }).join("");
+    }
+    
+    function formatTime(totalSec) { 
+      const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+      const s = (totalSec % 60).toString().padStart(2, '0'); 
+      return `${m}:${s}`; 
+    }
+
+    // INITIALIZATION
+    loadCase(0); 
+    buildAssessmentActionGrid(); 
+    buildRuleOutChecklist(); 
+    requestAnimationFrame(sweepLead2Canvas);
+  </script>
+</body>
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLFD Cadre - Environmental & Burn Simulation</title>
+<style>
+  :root {
+    --bg-dark: #0f172a;
+    --bg-panel: #1e293b;
+    --border: #334155;
+    --accent: #f59e0b; /* Amber for Environmental/Burns */
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --ecg-green: #22c55e;
+    --etco2-yellow: #eab308;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; width: 100%; overflow-x: hidden; }
+  
+  /* Layout */
+  #app-container { display: flex; width: 100%; min-height: 100vh; }
+  #sidebar { width: 350px; background: #020617; border-right: 2px solid var(--border); display: flex; flex-direction: column; padding: 1rem; }
+  #main-workspace { flex-grow: 1; display: flex; flex-direction: column; padding: 2rem; overflow-y: auto; background: var(--bg-dark); }
+  
+  /* Launch Screen Gate */
+  #launch-screen { position: fixed; inset: 0; background: rgba(2,6,23,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+  .btn-launch { background: linear-gradient(135deg, #d97706, #b45309); color: white; border: none; padding: 1.2rem 3rem; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+  
+  /* Telemetry Sidebar */
+  .monitor-box { border: 1px solid var(--border); border-radius: 8px; background: #000; margin-bottom: 1rem; padding: 0.5rem; text-align: center; position: relative; }
+  canvas { width: 100%; height: 100px; display: block; }
+  .canvas-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: var(--text-muted); font-weight: bold; z-index: 10; }
+  .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .vital-card { background: var(--bg-panel); border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; text-align: center; }
+  .vital-val { font-size: 1.5rem; font-weight: bold; font-family: monospace; }
+  .hr-val { color: var(--ecg-green); }
+  .spo2-val { color: #38bdf8; }
+  .bp-val { color: #f87171; }
+  .temp-val { color: #fcd34d; }
+  
+  #findings-log { flex-grow: 1; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-y: auto; font-size: 0.9rem; font-family: monospace; }
+  
+  /* Main Workspace Elements */
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }
+  .phase-section { display: none; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin-bottom: 2rem; }
+  .phase-section.active { display: block; }
+  
+  h2 { margin-bottom: 1rem; color: #f8fafc; font-size: 1.5rem; }
+  p { color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5; }
+  label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #cbd5e1; }
+  
+  textarea, input, select { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-family: inherit; }
+  button { background: #334155; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+  button:hover { background: #475569; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #d97706; }
+  
+  .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+  .action-btn { background: #1e293b; border: 1px solid #475569; padding: 1rem; text-align: center; border-radius: 8px; cursor: pointer; }
+  .action-btn:hover { background: #334155; }
+  .action-btn.completed { border-color: var(--ecg-green); color: var(--ecg-green); }
+  
+  .order-builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem; }
+  #order-list { list-style: none; margin-bottom: 1rem; }
+  #order-list li { background: #0f172a; border: 1px solid var(--border); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+  
+  .cqi-banner { padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-weight: bold; }
+  .cqi-pass { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #4ade80; }
+  .cqi-fail { background: rgba(220, 38, 38, 0.2); border: 1px solid #dc2626; color: #f87171; }
+  
+  .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+  .list-box { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+</style>
+</head>
+<body>
+
+<!-- LAUNCH SCREEN -->
+<div id="launch-screen">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Star_of_life2.svg/200px-Star_of_life2.svg.png" width="100" style="margin-bottom: 1rem; opacity: 0.8;" alt="EMS">
+  <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">SLFD CADRE: Environmental & Burn Emergencies</h1>
+  <p style="max-width: 600px; font-size: 1.1rem; margin-bottom: 2rem;">Zero-Preset Clinical Cockpit. Proceed through Dispatch, Assessment, Differentials, and Treatment based on SLFD Standing Orders for temperature extremes, burns, and toxins.</p>
+  <button class="btn-launch" onclick="initSim()">Start Clinical Simulation</button>
+</div>
+
+<div id="app-container">
+  <!-- TELEMETRY SIDEBAR -->
+  <div id="sidebar">
+    <div style="display:flex; justify-content: space-between; margin-bottom: 1rem; color: var(--text-muted);">
+      <span id="incident-id">CAD: ---</span>
+      <span id="scene-clock">00:00</span>
+    </div>
+    
+    <div class="monitor-box">
+      <div id="monitor-overlay" class="canvas-overlay">LEADS NOT ATTACHED</div>
+      <canvas id="ecgCanvas"></canvas>
+    </div>
+    
+    <div class="vitals-grid">
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">HR</div><div class="vital-val hr-val" id="val-hr">---</div></div>
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">SpO2</div><div class="vital-val spo2-val" id="val-spo2">---</div></div>
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">NIBP (MANUAL)</div><div class="vital-val bp-val" id="val-bp">---</div></div>
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">CORE TEMP</div><div class="vital-val temp-val" id="val-temp">---</div></div>
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">RR</div><div class="vital-val" id="val-rr">---</div></div>
+      <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">BGL</div><div class="vital-val" id="val-bgl">---</div></div>
+    </div>
+    
+    <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 0.2rem;">Live Findings Log</h3>
+    <div id="findings-log"></div>
+  </div>
+
+  <!-- MAIN WORKSPACE -->
+  <div id="main-workspace">
+    <div class="header">
+      <h2 id="phase-title">Phase 1: Dispatch & Doorway</h2>
+      <div><span style="color:var(--text-muted);">Current Scenario: </span><strong id="scenario-counter">1 / 5</strong></div>
+    </div>
+
+    <!-- Phase 1: Cognitive Gate -->
+    <div id="phase-1" class="phase-section active">
+      <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-left: 4px solid var(--accent); margin-bottom: 1.5rem;">
+        <strong>Dispatch:</strong> <span id="text-dispatch"></span><br><br>
+        <strong>Doorway Impression:</strong> <span id="text-doorway"></span>
+      </div>
+      <label>Q1. What is the immediate life threat?</label>
+      <textarea id="p1-q1" rows="3" placeholder="Enter clinical rationale..."></textarea>
+      <label>Q2. What is your initial diagnostic strategy and first intended intervention?</label>
+      <textarea id="p1-q2" rows="3" placeholder="Enter planned assessments and treatments..."></textarea>
+      <div style="text-align:right"><button class="btn-primary" onclick="goToPhase(2)">Proceed to Assessment</button></div>
+    </div>
+
+    <!-- Phase 2: Assessment Action Bar -->
+    <div id="phase-2" class="phase-section">
+      <p>Select physical assessments to uncover clinical data. Note SLFD COG requirements for these specific call types.</p>
+      <div class="action-grid" id="assessment-grid">
+        <button class="action-btn" onclick="runAssessment('Manual NIBP')">Obtain MANUAL NIBP</button>
+        <button class="action-btn" onclick="runAssessment('Core Temp')">Check Core/Rectal Temp</button>
+        <button class="action-btn" onclick="runAssessment('SpO2')">Check SpO2</button>
+        <button class="action-btn" onclick="runAssessment('BGL')">Check Blood Glucose</button>
+        <button class="action-btn" onclick="runAssessment('Expose')">Remove Clothing / Expose</button>
+        <button class="action-btn" style="border-color: var(--ecg-green);" onclick="attachMonitor(this)">Apply 4-Lead Cardiac Monitor</button>
+      </div>
+      <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="goToPhase(3)">Proceed to Differentials</button></div>
+    </div>
+
+    <!-- Phase 3: Rule-Out Funnel -->
+    <div id="phase-3" class="phase-section">
+      <label>Select Final Working Diagnosis:</label>
+      <select id="select-diagnosis">
+        <option value="" disabled selected>-- Select Diagnosis --</option>
+        <option value="Heat Stroke">Exertional Heat Stroke</option>
+        <option value="Severe Hypothermia">Severe Hypothermia</option>
+        <option value="Major Thermal Burn">Major Thermal Burn</option>
+        <option value="Chemical / OC Exposure">Chemical / OC Exposure</option>
+        <option value="Anaphylactic Shock">Anaphylactic Shock (Bite/Sting)</option>
+      </select>
+      
+      <label style="margin-top:1.5rem;">Select Justifications for Rule-Outs (Check all that apply):</label>
+      <div style="background: #0f172a; border: 1px solid var(--border); padding: 1rem; border-radius: 6px; height: 150px; overflow-y: auto; margin-bottom: 1rem;">
+        <div><input type="checkbox" id="ro1"> Core Temp >= 104F + AMS rules in Heat Stroke over Heat Exhaustion</div>
+        <div><input type="checkbox" id="ro2"> Core Temp < 82.4F rules in Severe Hypothermia (Atropine contraindicated)</div>
+        <div><input type="checkbox" id="ro3"> Absence of stridor/hives rules out Anaphylaxis</div>
+        <div><input type="checkbox" id="ro4"> Rule of 9s indicates >10% BSA Partial/Full thickness</div>
+      </div>
+
+      <label>Select Required SLFD Specialty Patient Forms:</label>
+      <select id="select-form">
+        <option value="" disabled selected>-- Select Form --</option>
+        <option value="Standard ePCR Only">Standard ePCR Only</option>
+        <option value="Trauma Form">Trauma Form</option>
+        <option value="Burn Center Addendum">Burn Form / Center Transfer</option>
+      </select>
+      <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="goToPhase(4)">Proceed to Treatment Builder</button></div>
+    </div>
+
+    <!-- Phase 4: Zero-Preset Order Builder -->
+    <div id="phase-4" class="phase-section">
+      <p style="color: #f87171; font-weight: bold; font-size:0.9rem; margin-bottom:1rem;">WARNING: ALL FIELDS ARE BLANK. YOU MUST MANUALLY CONFIGURE EVERY INTERVENTION.</p>
+      <div class="order-builder-row">
+        <div><label>Intervention / Med</label>
+          <select id="ob-med">
+            <option value="" selected>-- Select --</option>
+            <option value="Cold Water Immersion">Cold Water Immersion</option>
+            <option value="Warm Normal Saline">Warm Normal Saline</option>
+            <option value="Normal Saline">Normal Saline (Ambient)</option>
+            <option value="Dry Burn Sheet">Dry Burn Sheet / Dressings</option>
+            <option value="Wet Burn Sheet">Wet Burn Dressings</option>
+            <option value="Wipe Dry First">Wipe Face with Dry Cloth</option>
+            <option value="Saline Eye Irrigation">Saline Eye Irrigation</option>
+            <option value="Epinephrine 1:1,000">Epinephrine 1:1,000</option>
+            <option value="Atropine">Atropine</option>
+            <option value="Fentanyl">Fentanyl</option>
+            <option value="Midazolam">Midazolam</option>
+            <option value="Passive Rewarming">Passive Rewarming</option>
+          </select>
+        </div>
+        <div><label>Dose/Amt</label><input type="text" id="ob-dose" placeholder="e.g. 20, 500, 0.5"></div>
+        <div><label>Unit</label>
+          <select id="ob-unit">
+            <option value="" selected>--</option>
+            <option value="mg">mg</option>
+            <option value="mL">mL</option>
+            <option value="mL/kg">mL/kg</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <div><label>Route</label>
+          <select id="ob-route">
+            <option value="" selected>--</option>
+            <option value="IV/IO">IV/IO</option>
+            <option value="IM">IM</option>
+            <option value="Topical">Topical</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <div><button type="button" onclick="addOrder()">+ ADD</button></div>
+      </div>
+      <ul id="order-list"></ul>
+      <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="submitCQI()">Submit Plan to QA/QI</button></div>
+    </div>
+
+    <!-- Phase 5: CQI Debrief -->
+    <div id="phase-5" class="phase-section">
+      <div id="cqi-banner" class="cqi-banner"></div>
+      
+      <div class="comparison-grid">
+        <div class="list-box">
+          <h3 style="color:#38bdf8; margin-bottom:1rem;">Your Cognitive Input</h3>
+          <p><strong>Q1:</strong> <span id="out-q1"></span></p>
+          <p><strong>Q2:</strong> <span id="out-q2"></span></p>
+          <p><strong>Diagnosis:</strong> <span id="out-dx"></span></p>
+        </div>
+        <div class="list-box">
+          <h3 style="color:#4ade80; margin-bottom:1rem;">SLFD Expert Benchmark</h3>
+          <p><strong>Life Threat:</strong> <span id="bench-q1"></span></p>
+          <p><strong>Strategy:</strong> <span id="bench-q2"></span></p>
+          <p><strong>Correct Treatments:</strong> <span id="bench-tx"></span></p>
+        </div>
+      </div>
+
+      <div class="comparison-grid">
+        <div class="list-box" style="border-color: #22c55e;">
+          <h3 style="color:#4ade80; margin-bottom:1rem;">Plus (+) Behaviors</h3>
+          <ul id="plus-list" style="padding-left:1.5rem; color:var(--text-muted);"></ul>
+        </div>
+        <div class="list-box" style="border-color: #dc2626;">
+          <h3 style="color:#f87171; margin-bottom:1rem;">Delta (Δ) Deviations</h3>
+          <ul id="delta-list" style="padding-left:1.5rem; color:var(--text-muted);"></ul>
+        </div>
+      </div>
+
+      <div id="just-culture-chain" style="display:none; background: #450a0a; border: 1px solid #dc2626; padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+        <h3 style="color:#fca5a5; margin-bottom:1rem;">CRITICAL FAILURE: SLFD Just Culture Error Reporting Chain[cite: 1]</h3>
+        <ol style="padding-left: 1.5rem; color: #fecaca; line-height: 1.8;">
+          <li>Manage the patient condition that resulted from the error.</li>
+          <li>Contact the Captain/EMS Division Chief immediately to report the error.</li>
+          <li>Inform the hospital staff of the error.</li>
+          <li>Inform Sugar Land Fire Department Medical Director.</li>
+          <li>Complete the error self-reporting form.</li>
+        </ol>
+      </div>
+
+      <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="nextScenario()">Load Next Scenario</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// SLFD COG Case Pool (Environmental, Burns, Toxins)
+const scenarios = [
+  {
+    id: "CAD-2028-05-8812",
+    dispatch: "19 y/o Male - Heat Exposure (High School Football Practice)",
+    doorway: "August, 103°F ambient. Patient is collapsed on the field, confused, combatitive, skin is hot and dry.",
+    initialVitals: { hr: 145, bp: '90/50', spo2: 96, temp: '105.8°F', rr: 28, bgl: 92 },
+    expertCognition: {
+      q1: "Exertional Heat Stroke (Core Temp > 104F with Altered Mental Status)[cite: 2].",
+      q2: "Rapid active cooling via Cold Water Immersion is the absolute priority. Do not delay for intubation or transport[cite: 2]."
+    },
+    correctOrders: "Cold Water Immersion immediately, Normal Saline 20mL/kg IV/IO bolus.",
+    fatalPitfalls: ["Epinephrine 1:1,000", "Atropine"], 
+    requiredForms: "Standard ePCR Only"
+  },
+  {
+    id: "CAD-2028-05-8813",
+    dispatch: "60 y/o Male - Unconscious Outdoors (Freezing temperatures)",
+    doorway: "Patient found in an alleyway overnight. Unresponsive, skin is ice cold to touch, notable absence of shivering.",
+    initialVitals: { hr: 32, bp: '70/40', spo2: 84, temp: '79.5°F', rr: 6, bgl: 65 },
+    expertCognition: {
+      q1: "Severe Hypothermia (<82.4F) leading to profound bradycardia and cardiogenic shock[cite: 2].",
+      q2: "Handle gently to avoid inducing V-Fib. Administer Warm IV fluids. Withhold Atropine/Epi until patient is rewarmed[cite: 2]."
+    },
+    correctOrders: "Passive Rewarming, Warm Normal Saline 20mL/kg IV/IO.",
+    fatalPitfalls: ["Atropine", "Epinephrine 1:1,000"], // Fatal in severe hypothermia
+    requiredForms: "Standard ePCR Only"
+  },
+  {
+    id: "CAD-2028-05-8814",
+    dispatch: "35 y/o Female - House Fire Rescue",
+    doorway: "Extricated from structure fire. Soot around mouth, coughing, approx 45% BSA partial and full-thickness burns to torso/legs.",
+    initialVitals: { hr: 130, bp: '100/65', spo2: 91, temp: '98.0°F', rr: 26, bgl: 110 },
+    expertCognition: {
+      q1: "Airway compromise (inhalation injury) and severe hypovolemic shock from major fluid shifts[cite: 2].",
+      q2: "Protect airway, apply DRY burn sheets (wet causes hypothermia in large burns), and initiate Normal Saline 500mL bolus or 20mL/kg[cite: 2]."
+    },
+    correctOrders: "Dry Burn Sheet / Dressings, Normal Saline 500mL IV/IO, Fentanyl (Pain Management).",
+    fatalPitfalls: ["Wet Burn Sheet"], // Induces fatal hypothermia on >10% BSA
+    requiredForms: "Burn Center Addendum"
+  },
+  {
+    id: "CAD-2028-05-8815",
+    dispatch: "25 y/o Male - Assault (Pepper Sprayed by PD/Security)",
+    doorway: "Patient in custody, screaming, eyes swollen shut, coughing profusely, face covered in orange residue.",
+    initialVitals: { hr: 115, bp: '145/90', spo2: 98, temp: '98.6°F', rr: 22, bgl: 105 },
+    expertCognition: {
+      q1: "Chemical/OC exposure causing severe mucosal irritation and potential reactive airway[cite: 2].",
+      q2: "Wipe with DRY cloth first to remove bulk chemical, then irrigate eyes with Normal Saline continuously (10gtt sets)[cite: 2]."
+    },
+    correctOrders: "Wipe Face with Dry Cloth, Saline Eye Irrigation, Normal Saline N/A Topical.",
+    fatalPitfalls: ["Cold Water Immersion"], // Throwing water on OC without wiping spreads it
+    requiredForms: "Standard ePCR Only"
+  },
+  {
+    id: "CAD-2028-05-8816",
+    dispatch: "40 y/o Male - Allergic Reaction / Multiple Bee Stings",
+    doorway: "Landscaper swarmed by bees. Face severely swollen, audible stridor, diffuse hives, struggling to breathe.",
+    initialVitals: { hr: 135, bp: '80/40', spo2: 88, temp: '99.1°F', rr: 32, bgl: 100 },
+    expertCognition: {
+      q1: "Anaphylactic Shock leading to airway occlusion and distributive shock[cite: 2].",
+      q2: "Immediate IM Epinephrine 1:1,000 is required to halt mast cell degranulation. Do not delay for IV access[cite: 2]."
+    },
+    correctOrders: "Epinephrine 1:1,000 0.5mg IM, Normal Saline 20mL/kg IV/IO bolus.",
+    fatalPitfalls: ["Passive Rewarming"], // Filler pitfall, real pitfall is omitting Epi
+    requiredForms: "Standard ePCR Only"
+  }
+];
+
+let currIdx = 0;
+let sceneClock = 0;
+let clockInterval = null;
+let monitorActive = false;
+let orderQueue = [];
+
+const el = id => document.getElementById(id);
+
+function initSim() {
+  el('launch-screen').style.display = 'none';
+  loadScenario();
+}
+
+function loadScenario() {
+  const s = scenarios[currIdx];
+  monitorActive = false;
+  el('monitor-overlay').style.display = 'flex';
+  el('val-hr').innerText = '---';
+  el('val-spo2').innerText = '---';
+  el('val-bp').innerText = '---';
+  el('val-temp').innerText = '---';
+  el('val-rr').innerText = '---';
+  el('val-bgl').innerText = '---';
+  el('findings-log').innerHTML = '';
+  orderQueue = [];
+  el('order-list').innerHTML = '';
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('completed'));
+  
+  el('p1-q1').value = ''; el('p1-q2').value = '';
+  el('select-diagnosis').value = ''; el('select-form').value = '';
+  el('ro1').checked = false; el('ro2').checked = false; el('ro3').checked = false; el('ro4').checked = false;
+  
+  el('text-dispatch').innerText = s.dispatch;
+  el('text-doorway').innerText = s.doorway;
+  el('incident-id').innerText = `CAD: ${s.id}`;
+  
+  sceneClock = 0;
+  clearInterval(clockInterval);
+  clockInterval = setInterval(() => {
+    sceneClock++;
+    let m = Math.floor(sceneClock / 60).toString().padStart(2, '0');
+    let sec = (sceneClock % 60).toString().padStart(2, '0');
+    el('scene-clock').innerText = `${m}:${sec}`;
+  }, 1000);
+  
+  goToPhase(1);
+  drawCanvasLoop();
+}
+
+function goToPhase(num) {
+  document.querySelectorAll('.phase-section').forEach(p => p.classList.remove('active'));
+  el(`phase-${num}`).classList.add('active');
+  const titles = ["Dispatch & Doorway", "Assessment Action Bar", "Rule-Out Funnel", "Zero-Preset Order Builder", "CQI Debrief & Plus/Delta"];
+  el('phase-title').innerText = `Phase ${num}: ${titles[num-1]}`;
+}
+
+function logMsg(msg) {
+  let m = Math.floor(sceneClock / 60).toString().padStart(2, '0');
+  let sec = (sceneClock % 60).toString().padStart(2, '0');
+  el('findings-log').innerHTML += `<div>[${m}:${sec}] ${msg}</div>`;
+  el('findings-log').scrollTop = el('findings-log').scrollHeight;
+}
+
+function runAssessment(type) {
+  const s = scenarios[currIdx];
+  event.target.classList.add('completed');
+  if(type === 'Manual NIBP') {
+    el('val-bp').innerText = s.initialVitals.bp;
+    logMsg(`Manual BP obtained: ${s.initialVitals.bp} mmHg`);
+    sceneClock += 45;
+  }
+  if(type === 'Core Temp') {
+    el('val-temp').innerText = s.initialVitals.temp;
+    logMsg(`Core Temp recorded: ${s.initialVitals.temp}`);
+    sceneClock += 30;
+  }
+  if(type === 'SpO2') {
+    el('val-spo2').innerText = s.initialVitals.spo2 + '%';
+    el('val-rr').innerText = s.initialVitals.rr;
+    logMsg(`SpO2 reading: ${s.initialVitals.spo2}%, RR: ${s.initialVitals.rr}`);
+    sceneClock += 10;
+  }
+  if(type === 'BGL') {
+    el('val-bgl').innerText = s.initialVitals.bgl;
+    logMsg(`Blood glucose: ${s.initialVitals.bgl} mg/dL`);
+    sceneClock += 20;
+  }
+  if(type === 'Expose') {
+    logMsg(`Patient exposed. Confirming full skin presentation.`);
+    sceneClock += 15;
+  }
+}
+
+function attachMonitor(btn) {
+  btn.classList.add('completed');
+  monitorActive = true;
+  el('monitor-overlay').style.display = 'none';
+  el('val-hr').innerText = scenarios[currIdx].initialVitals.hr;
+  logMsg("4-Lead Monitor attached. ECG visible.");
+  sceneClock += 25;
+}
+
+function addOrder() {
+  const med = el('ob-med').value;
+  const dose = el('ob-dose').value;
+  const unit = el('ob-unit').value;
+  const route = el('ob-route').value;
+  
+  if(!med || !dose || !unit || !route) {
+    alert("Must complete all fields to add intervention.");
+    return;
+  }
+  
+  const orderStr = `${med} ${dose}${unit} ${route}`;
+  orderQueue.push(orderStr);
+  
+  const li = document.createElement('li');
+  li.innerHTML = `<span>${orderStr}</span> <button style="padding:0.25rem 0.5rem; background:#dc2626;" onclick="this.parentElement.remove(); orderQueue.splice(orderQueue.indexOf('${orderStr}'), 1)">X</button>`;
+  el('order-list').appendChild(li);
+  
+  el('ob-med').value = ''; el('ob-dose').value = ''; el('ob-unit').value = ''; el('ob-route').value = '';
+}
+
+function submitCQI() {
+  const s = scenarios[currIdx];
+  clearInterval(clockInterval);
+  goToPhase(5);
+  
+  el('out-q1').innerText = el('p1-q1').value || "No response provided.";
+  el('out-q2').innerText = el('p1-q2').value || "No response provided.";
+  el('out-dx').innerText = el('select-diagnosis').value || "None selected";
+  
+  el('bench-q1').innerText = s.expertCognition.q1;
+  el('bench-q2').innerText = s.expertCognition.q2;
+  el('bench-tx').innerText = s.correctOrders;
+  
+  const pList = el('plus-list'); const dList = el('delta-list');
+  pList.innerHTML = ''; dList.innerHTML = '';
+  
+  let passed = true;
+  let fatalTriggered = false;
+  
+  if (el('val-bp').innerText === '---') {
+    dList.innerHTML += `<li>Failed to obtain MANUAL Blood Pressure[cite: 2]</li>`;
+    passed = false;
+  } else {
+    pList.innerHTML += `<li>Obtained Manual BP prior to intervention.</li>`;
+  }
+  if (el('val-temp').innerText === '---') {
+    dList.innerHTML += `<li>Failed to obtain Core Temperature in an environmental case[cite: 2]</li>`;
+    passed = false;
+  }
+  
+  const fullOrderStr = orderQueue.join(" | ");
+  
+  s.fatalPitfalls.forEach(pitfall => {
+    if(fullOrderStr.includes(pitfall)) {
+      fatalTriggered = true;
+      dList.innerHTML += `<li>FATAL PITFALL: Administered ${pitfall}. This is strictly contraindicated in this scenario[cite: 2].</li>`;
+    }
+  });
+  
+  if(s.id === "CAD-2028-05-8816" && !fullOrderStr.includes("Epinephrine")) {
+     fatalTriggered = true;
+     dList.innerHTML += `<li>FATAL PITFALL: Failed to administer Epinephrine 1:1,000 for Anaphylaxis[cite: 2].</li>`;
+  }
+  
+  if(fatalTriggered) {
+    passed = false;
+    crashPatient();
+    el('cqi-banner').className = 'cqi-banner cqi-fail';
+    el('cqi-banner').innerText = "LEVEL 3/4 CQI MAJOR SAFETY DEVIATION: SENTINEL EVENT";
+    el('just-culture-chain').style.display = 'block';
+  } else {
+    el('cqi-banner').className = 'cqi-banner cqi-pass';
+    el('cqi-banner').innerText = "CQI AUDIT COMPLETE";
+    el('just-culture-chain').style.display = 'none';
+    if(orderQueue.length > 0) pList.innerHTML += `<li>Submitted treatments: ${fullOrderStr}</li>`;
+    else dList.innerHTML += `<li>No treatments submitted.</li>`;
+  }
+}
+
+function crashPatient() {
+  el('val-hr').innerText = '0';
+  el('val-bp').innerText = '0/0';
+  el('val-spo2').innerText = '---';
+  el('val-hr').style.color = '#dc2626';
+}
+
+function nextScenario() {
+  currIdx = (currIdx + 1) % scenarios.length;
+  el('scenario-counter').innerText = `${currIdx + 1} / 5`;
+  loadScenario();
+}
+
+let ecgX = 0; 
+function drawCanvasLoop() {
+  const c = el('ecgCanvas'); const ctx = c.getContext('2d');
+  if(c.width !== c.offsetWidth) { c.width = c.offsetWidth; c.height = c.offsetHeight; }
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(0,0,c.width,c.height);
+  
+  if (monitorActive && el('val-hr').innerText !== '0') {
+    let hr = parseInt(el('val-hr').innerText) || 80;
+    let cycleLen = Math.floor(6000 / hr);
+    
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ecgX, 50);
+    
+    let y = 50 + Math.sin(ecgX/10)*2;
+    if(ecgX % cycleLen > (cycleLen - 10) && ecgX % cycleLen < (cycleLen - 5)) y = 10; 
+    
+    ctx.lineTo(ecgX+2, y);
+    ctx.stroke();
+    ecgX += 2;
+    if(ecgX > c.width) ecgX = 0;
+  } else if (monitorActive && el('val-hr').innerText === '0') {
+    // Flatline
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ecgX, 50);
+    ctx.lineTo(ecgX+2, 50);
+    ctx.stroke();
+    ecgX += 2;
+    if(ecgX > c.width) ecgX = 0;
+  }
+  
+  requestAnimationFrame(drawCanvasLoop);
+}
+</script>
+</body>
+</html>

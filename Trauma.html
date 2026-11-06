@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLFD Cadre: Trauma & Resuscitation Simulator</title>
+  <style>
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-inner: #0b1120;
+      --border-dark: #334155;
+      --slfd-red: #dc2626;
+      --slfd-red-hover: #b91c1c;
+      --slfd-gold: #f59e0b;
+      --slfd-blue: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; 
+    }
+
+    .font-mono-code { font-family: var(--font-mono); }
+
+    header {
+      background-color: #0f172a;
+      border-bottom: 2px solid rgba(220, 38, 38, 0.6);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .badge-red { background-color: var(--slfd-red); color: #fff; font-size: 11px; font-weight: 900; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; }
+    .badge-gold { background-color: rgba(245, 158, 11, 0.2); color: var(--slfd-gold); border: 1px solid var(--slfd-gold); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 4px; font-family: var(--font-mono); }
+    .btn-header { background-color: #1e293b; color: #cbd5e1; border: 1px solid #475569; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-header:hover { background-color: #334155; color: #fff; }
+
+    .app-container { display: flex; flex: 1; height: calc(100vh - 54px); overflow: hidden; }
+
+    .sidebar-telemetry { width: 380px; background-color: #0b1324; border-right: 1px solid var(--border-dark); padding: 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; overflow-y: auto; }
+    .monitor-card { background-color: #000; border: 2px solid #1e293b; border-radius: 8px; padding: 10px; box-shadow: inset 0 2px 10px rgba(0,0,0,1); }
+    .monitor-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-family: var(--font-mono); color: #94a3b8; margin-bottom: 6px; }
+    .pulse-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #64748b; margin-right: 6px; }
+
+    .vitals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: var(--font-mono); text-align: center; }
+    .vital-tile { background-color: rgba(15, 23, 42, 0.9); border: 1px solid #1e293b; border-radius: 6px; padding: 10px 4px; }
+    .vital-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+    .vital-val { font-size: 20px; font-weight: 900; margin-top: 4px; }
+
+    .scene-bar { background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 14px; }
+    .findings-card { background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; flex: 1; min-height: 200px; }
+    .findings-header { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
+    .findings-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-family: var(--font-mono); }
+    .findings-item { padding-bottom: 6px; border-bottom: 1px solid #1e293b; line-height: 1.5; }
+
+    .workspace-main { flex: 1; background-color: var(--bg-dark); display: flex; flex-direction: column; overflow: hidden; }
+    .phase-nav { background-color: #0b1324; border-bottom: 1px solid var(--border-dark); padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    .tab-btn { padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; border: 1px solid transparent; cursor: pointer; }
+    .tab-active { background-color: var(--slfd-red); color: #fff; }
+    .tab-unlocked { background-color: #1e293b; color: #cbd5e1; border-color: #334155; }
+    .tab-locked { background-color: #0f172a; color: #475569; opacity: 0.5; cursor: not-allowed; }
+
+    .phase-content-area { padding: 24px; max-width: 1000px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
+    .card { background-color: var(--panel-bg); border: 1px solid var(--border-dark); border-radius: 8px; padding: 20px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+    .cad-alert-box { border-left: 4px solid var(--slfd-red); background-color: #121c2d; }
+
+    .btn-primary { background-color: var(--slfd-blue); color: #fff; font-weight: 700; font-size: 13px; padding: 12px 20px; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; }
+    .btn-action-gold { background-color: var(--slfd-red); color: #fff; font-weight: 800; font-size: 13px; padding: 12px 20px; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; width: 100%; }
+    .btn-danger { background-color: var(--slfd-red); color: #fff; font-weight: 800; font-size: 14px; padding: 14px 20px; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; width: 100%; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4); }
+    
+    .assessment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .assessment-btn { background-color: var(--card-bg); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; text-align: left; cursor: pointer; display: flex; align-items: flex-start; gap: 12px; color: var(--text-main); }
+    .assessment-icon { font-size: 20px; padding: 6px; background-color: #0f172a; border-radius: 4px; border: 1px solid #334155; }
+
+    select, input[type="text"], input[type="number"], textarea { width: 100%; background-color: #0b1120; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 4px; font-size: 13px; outline: none; }
+    select:focus, input:focus, textarea:focus { border-color: var(--slfd-red); box-shadow: 0 0 0 1px var(--slfd-red); }
+
+    .order-queue-box { background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 150px; }
+    .order-row { background-color: #1e293b; border: 1px solid #334155; padding: 10px 14px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+    .order-index { width: 24px; height: 24px; border-radius: 50%; background-color: #0f172a; border: 1px solid #475569; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-right: 12px; }
+    .btn-sm-ctrl { background-color: #0f172a; color: #cbd5e1; border: 1px solid #475569; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    .btn-sm-del { background-color: #450a0a; color: #fca5a5; border: 1px solid #991b1b; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+
+    .start-screen-overlay { position: absolute; inset: 0; background: radial-gradient(circle at center, #0f172a 0%, #070b12 100%); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .start-box { max-width: 600px; background-color: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 12px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); text-align: center; }
+    .btn-launch { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; font-size: 16px; font-weight: 800; padding: 16px 32px; border-radius: 8px; border: none; cursor: pointer; text-transform: uppercase; box-shadow: 0 6px 15px rgba(220, 38, 38, 0.5); margin-top: 24px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- LAUNCH SCREEN -->
+  <div id="startOverlay" class="start-screen-overlay">
+    <div class="start-box">
+      <span class="badge-red" style="font-size: 13px;">SUGAR LAND FIRE DEPARTMENT</span>
+      <h2 style="font-size: 26px; font-weight: 800; color: #fff; margin-top: 16px;">Trauma & Resuscitation Simulator</h2>
+      <div style="font-size: 13px; color: var(--slfd-gold); font-family: var(--font-mono); font-weight: 600; margin-top: 8px;">SETRAC Pre-Hospital Adult Trauma Transport Guidelines</div>
+      <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6; margin-top: 16px;">
+        Zero-Preset Clinical Cockpit. Proceed through Dispatch, Assessment, Differentials, and Treatment based on SLFD Trauma COGs and SETRAC MOI/Acuity factors.
+      </p>
+      <button class="btn-launch" onclick="startSimulation()">▶ Start Clinical Simulation</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="badge-red">SLFD CADRE</span>
+      <strong style="font-size: 16px; color: #fff;">Trauma & Hemorrhage Control</strong>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="badge-gold" id="activeCaseBadge">INCIDENT #2028-101</span>
+      <button onclick="cycleScenario()" class="btn-header">Cycle Random Incident ↻</button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <div class="app-container">
+
+    <!-- TELEMETRY SIDEBAR -->
+    <aside class="sidebar-telemetry">
+      <div class="monitor-card">
+        <div class="monitor-header">
+          <span style="display: flex; align-items: center;"><span class="pulse-dot" id="pulseIndicator"></span>ECG MONITOR</span>
+        </div>
+        <canvas id="liveLead2Canvas" width="340" height="90" style="width: 100%; height: 90px; background: #000; display: block; border-radius: 4px;"></canvas>
+      </div>
+
+      <div class="vitals-grid">
+        <div class="vital-tile"><div class="vital-lbl">HR (BPM)</div><div id="disp-hr" class="vital-val" style="color: #34d399;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">BP (NIBP)</div><div id="disp-bp" class="vital-val" style="color: #22d3ee;">--/--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">SpO2 (%)</div><div id="disp-spo2" class="vital-val" style="color: #fbbf24;">--%</div></div>
+        <div class="vital-tile"><div class="vital-lbl">EtCO2</div><div id="disp-etco2" class="vital-val" style="color: #fb923c;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">RESP RATE</div><div id="disp-rr" class="vital-val" style="color: #2dd4bf;">--</div></div>
+        <div class="vital-tile"><div class="vital-lbl">GCS</div><div id="disp-bgl" class="vital-val" style="color: #c084fc;">--</div></div>
+      </div>
+
+      <div class="scene-bar">
+        <div><span style="color: #94a3b8;">SCENE TIME: </span><span id="sceneClock" style="font-weight: 800; color: #fff; font-size: 16px;">00:00</span></div>
+      </div>
+
+      <div class="findings-card">
+        <div class="findings-header"><span>Active Findings Log</span><span id="findingsCount" style="color: var(--slfd-red);">0 Logged</span></div>
+        <div id="findingsLog" class="findings-list"></div>
+      </div>
+    </aside>
+
+    <!-- RIGHT WORKSPACE -->
+    <main class="workspace-main">
+      <nav class="phase-nav">
+        <button id="stepTab-0" class="tab-btn tab-active" onclick="switchPhaseView(0)">1. Doorway</button> <span style="color:#475569">&rarr;</span>
+        <button id="stepTab-1" class="tab-btn tab-locked" onclick="switchPhaseView(1)">2. Assessment</button> <span style="color:#475569">&rarr;</span>
+        <button id="stepTab-2" class="tab-btn tab-locked" onclick="switchPhaseView(2)">3. Differentials</button> <span style="color:#475569">&rarr;</span>
+        <button id="stepTab-3" class="tab-btn tab-locked" onclick="switchPhaseView(3)">4. Orders</button> <span style="color:#475569">&rarr;</span>
+        <button id="stepTab-4" class="tab-btn tab-locked" onclick="switchPhaseView(4)">5. CQI</button>
+      </nav>
+
+      <div class="phase-content-area">
+
+        <!-- PHASE 1 -->
+        <div id="phase-0" class="card cad-alert-box">
+          <div style="margin-bottom: 12px;"><span class="badge-red">PRIORITY 1 TRAUMA</span></div>
+          <p id="cadDispatchText" style="font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 16px;"></p>
+          <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+            <div style="font-size: 11px; font-weight: bold; color: #94a3b8; margin-bottom: 6px;">DOORWAY IMPRESSION</div>
+            <p id="doorwayImpressionText" style="font-size: 14px; color: #cbd5e1;"></p>
+          </div>
+          <div style="border: 1px solid rgba(220, 38, 38, 0.4); background-color: #0c162c; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <strong style="font-size: 14px; color: #fca5a5;">Pre-Assessment Cognitive Gate</strong>
+            <label style="font-size: 12px; color: #e2e8f0;">1. Immediate Life-Threat Concerns:</label>
+            <textarea id="cog_q1" rows="2"></textarea>
+            <label style="font-size: 12px; color: #e2e8f0;">2. Targeted Diagnostic Strategy:</label>
+            <textarea id="cog_q2" rows="2"></textarea>
+            <button class="btn-action-gold" onclick="submitPhase(1)">Lock In & Proceed to Assessments &rarr;</button>
+          </div>
+        </div>
+
+        <!-- PHASE 2 -->
+        <div id="phase-1" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 16px; color: #fff;">Physical Assessment Action Bar</h3>
+            <button class="btn-primary" onclick="switchPhaseView(2)">Formulate Rule-Out &rarr;</button>
+          </div>
+          <div class="assessment-grid" id="assessmentActionGrid"></div>
+        </div>
+
+        <!-- PHASE 3 -->
+        <div id="phase-2" class="hidden card" style="display: flex; flex-direction: column; gap: 16px;">
+          <h3 style="font-size: 16px; color: #fff;">Diagnostic Rule-Out Funnel</h3>
+          <label style="font-size: 13px; color: #cbd5e1;">1. Final Working Diagnosis:</label>
+          <select id="sel_working_dx" style="padding: 12px;">
+            <option value="">-- Select Diagnosis --</option>
+            <option value="hemorrhagic_shock">Hemorrhagic Shock (Penetrating)</option>
+            <option value="tension_pneumo">Tension Pneumothorax (Blunt Trauma)</option>
+            <option value="crush_syndrome">Crush Syndrome / Prolonged Entrapment</option>
+            <option value="tbi_herniation">Severe TBI with Active Herniation</option>
+            <option value="pelvic_fx">Unstable Pelvic Fracture / Internal Hemorrhage</option>
+          </select>
+          <label style="font-size: 13px; color: #cbd5e1;">2. Objective Findings (SETRAC Criteria):</label>
+          <div id="ruleOutChecklist" style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+          <label style="font-size: 13px; color: #cbd5e1;">3. Required SLFD Forms:</label>
+          <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 12px; display: flex; gap: 16px;">
+            <label><input type="checkbox" id="form_trauma"> Trauma Center Form</label>
+          </div>
+          <button class="btn-primary" onclick="lockDiagnosisAndProceed()">Lock Diagnosis & Build Orders &rarr;</button>
+        </div>
+
+        <!-- PHASE 4 -->
+        <div id="phase-3" class="hidden card" style="display: flex; flex-direction: column; gap: 16px;">
+          <h3 style="font-size: 16px; color: #fff;">Sequential Treatment Order Builder</h3>
+          <div style="background-color: var(--card-inner); border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px;">
+            <label style="font-size: 12px; color: #94a3b8;">Intervention Category:</label>
+            <select id="order_category" onchange="updateOrderBuilderFields()" style="margin-bottom: 12px;">
+              <option value="">-- Select Category --</option>
+              <option value="hemorrhage">Hemorrhage / Mechanical Control</option>
+              <option value="fluids_blood">Resuscitation (Blood / Fluids)</option>
+              <option value="medication">Medication Administration</option>
+              <option value="procedures">Advanced Procedures</option>
+            </select>
+            <div id="dynamicOrderFields"></div>
+            <button class="btn-action-gold" style="margin-top: 12px;" onclick="addIntervention()">+ Add Intervention</button>
+          </div>
+          <div id="orderQueueContainer" class="order-queue-box"></div>
+          <button class="btn-danger" onclick="executeTreatmentPlan()">⚡ Execute Treatment Plan</button>
+        </div>
+
+        <!-- PHASE 5 -->
+        <div id="phase-4" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
+          <div id="cqiBanner" style="padding: 16px; border-radius: 8px; text-align: center; font-weight: 800; font-size: 15px;"></div>
+          <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="background-color: var(--card-inner); padding: 16px; border-radius: 6px; border: 1px solid var(--border-dark);">
+              <div style="color: #94a3b8; font-weight: bold;">Trainee Cognition:</div><div id="audit_trainee_cog" class="font-mono-code" style="color: #cbd5e1; font-size: 12px;"></div>
+            </div>
+            <div style="background-color: var(--card-inner); padding: 16px; border-radius: 6px; border: 1px solid rgba(220, 38, 38, 0.4);">
+              <div style="color: #fca5a5; font-weight: bold;">SLFD Benchmark:</div><div id="audit_expert_cog" class="font-mono-code" style="color: #cbd5e1; font-size: 12px;"></div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="card" style="border-color: rgba(16, 185, 129, 0.3);">
+              <div style="color: #34d399; font-weight: 800; margin-bottom: 10px;">Plus (+) - Guideline Adherence</div>
+              <ul id="cqiPlusList" style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px;"></ul>
+            </div>
+            <div class="card" style="border-color: rgba(220, 38, 38, 0.3);">
+              <div style="color: #f87171; font-weight: 800; margin-bottom: 10px;">Delta (&Delta;) - Deviations</div>
+              <ul id="cqiDeltaList" style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px;"></ul>
+            </div>
+          </div>
+          <div id="justCultureBox" class="hidden card" style="background-color: rgba(69, 10, 10, 0.6); border-color: var(--slfd-red);">
+            <div style="font-size: 13px; font-weight: 800; color: #fca5a5; margin-bottom: 10px;">⚠️ Level 3/4 Event: SLFD Just Culture Error Reporting Chain</div>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; font-size: 11px; text-align: center; color: #fff;">
+              <div style="background: rgba(127, 29, 29, 0.5); padding: 8px; border-radius: 4px;">1. Recognize Error</div>
+              <div style="background: rgba(127, 29, 29, 0.5); padding: 8px; border-radius: 4px;">2. Manage Patient</div>
+              <div style="background: rgba(127, 29, 29, 0.5); padding: 8px; border-radius: 4px;">3. Contact Capt/BC</div>
+              <div style="background: rgba(127, 29, 29, 0.5); padding: 8px; border-radius: 4px;">4. Notify Hospital</div>
+              <div style="background: rgba(127, 29, 29, 0.5); padding: 8px; border-radius: 4px;">5. Submit Form</div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end;">
+            <button class="btn-primary" onclick="cycleScenario()">Proceed to Next Incident &rarr;</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let currentCaseIdx = 0;
+    let sceneSeconds = 0;
+    let timerInterval = null;
+    let isSimRunning = false;
+    let isEcgActive = false; 
+    let loggedFindings = [];
+    let currentTreatmentPlan = [];
+    let animOffset = 0;
+
+    const casePool = [
+      {
+        id: "2028-101",
+        cad: "Medic 1 dispatched to a 28 y/o male with a gunshot wound to the lower abdomen.",
+        doorway: "Patient is supine, pale, and profusely diaphoretic. PD applied a tourniquet to the right leg. Patient is agitated with a weak, rapid radial pulse.",
+        initialVitals: { hr: 135, bp: "78/40", spo2: "92%", etco2: "25", rr: "28", bgl: "14" }, // GCS 14 mapped to BGL tile for simplicity
+        trueDx: "hemorrhagic_shock",
+        dxName: "Hemorrhagic Shock (Penetrating)",
+        expertCognition: {
+          q1: "Hemorrhagic shock and impending cardiovascular collapse. SETRAC Level I/II acuity met (SBP < 90, TQ used)[cite: 2].",
+          q2: "Permissive hypotension strategy. Initiate Whole Blood, TXA, and Calcium. Avoid large volume crystalloids."
+        },
+        correctOrders: [{ category: "fluids_blood", item: "whole_blood" }, { category: "medication", item: "txa" }, { category: "medication", item: "calcium" }],
+        fatalPitfalls: [{ category: "fluids_blood", item: "ns_1000", reason: "Large volume crystalloids dilute clotting factors and worsen trauma-induced coagulopathy." }],
+        requiredForms: ["form_trauma"]
+      },
+      {
+        id: "2028-102",
+        cad: "Medic 2 dispatched to Auto vs Pedestrian. 60 y/o female struck at 45 mph.",
+        doorway: "Patient has a highly unstable pelvis on visual inspection and severe abdominal bruising. Pulses are thready.",
+        initialVitals: { hr: 125, bp: "85/50", spo2: "94%", etco2: "30", rr: "24", bgl: "13" },
+        trueDx: "pelvic_fx",
+        dxName: "Unstable Pelvic Fracture",
+        expertCognition: {
+          q1: "Massive retroperitoneal hemorrhage secondary to unstable pelvic ring disruption. Level I/II acuity (Age > 55, Auto vs Ped, SBP < 90)[cite: 2].",
+          q2: "Immediate mechanical stabilization to reduce pelvic volume. Resuscitate with Whole Blood."
+        },
+        correctOrders: [{ category: "hemorrhage", item: "pelvic_binder" }, { category: "fluids_blood", item: "whole_blood" }],
+        fatalPitfalls: [{ category: "fluids_blood", item: "ns_1000", reason: "Standard NS bolus worsens bleeding profile." }],
+        requiredForms: ["form_trauma"]
+      },
+      {
+        id: "2028-103",
+        cad: "Medic 3 dispatched to a 45 y/o male trapped under a concrete slab at an industrial site.",
+        doorway: "Legs entrapped for > 4 hours. Extrication is progressing. Patient is alert but in severe pain.",
+        initialVitals: { hr: 110, bp: "130/80", spo2: "96%", etco2: "35", rr: "20", bgl: "15" },
+        trueDx: "crush_syndrome",
+        dxName: "Crush Syndrome",
+        expertCognition: {
+          q1: "Crush syndrome leading to reperfusion injury, hyperkalemia, and acidosis upon release. Extended extrication MOI factor[cite: 2].",
+          q2: "Apply tourniquets prior to release if possible. Administer Sodium Bicarbonate

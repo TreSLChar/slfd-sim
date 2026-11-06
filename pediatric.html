@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLFD Cadre - Pediatric Simulation</title>
+<style>
+  :root {
+    --bg-dark: #0f172a;
+    --bg-panel: #1e293b;
+    --border: #334155;
+    --accent: #3b82f6; /* Pedi Blue */
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --ecg-green: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; width: 100%; display: flex; overflow-x: hidden; }
+  
+  #launch-screen { position: fixed; inset: 0; background: rgba(2,6,23,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+  .btn-launch { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border: none; padding: 1.2rem 3rem; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+  
+  #sidebar { width: 350px; background: #020617; border-right: 2px solid var(--border); display: flex; flex-direction: column; padding: 1rem; flex-shrink: 0; height: 100vh; overflow-y: auto; }
+  #main-workspace { flex-grow: 1; display: flex; flex-direction: column; padding: 2rem; overflow-y: auto; height: 100vh; background: var(--bg-dark); }
+  
+  .monitor-box { border: 1px solid var(--border); border-radius: 8px; background: #000; margin-bottom: 1rem; padding: 0.5rem; text-align: center; position: relative; }
+  canvas { width: 100%; height: 100px; display: block; }
+  .canvas-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: var(--text-muted); font-weight: bold; z-index: 10; }
+  .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .vital-card { background: var(--bg-panel); border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; text-align: center; }
+  .vital-val { font-size: 1.5rem; font-weight: bold; font-family: monospace; }
+  
+  #findings-log { flex-grow: 1; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-y: auto; font-size: 0.9rem; font-family: monospace; }
+  
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }
+  .phase-section { display: none; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin-bottom: 2rem; }
+  .phase-section.active { display: block; }
+  
+  h2 { margin-bottom: 1rem; color: #f8fafc; font-size: 1.5rem; }
+  p { color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5; }
+  label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #cbd5e1; }
+  
+  textarea, input, select { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-family: inherit; }
+  button { background: #334155; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+  button:hover { background: #475569; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1e3a8a; }
+  
+  .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+  .action-btn { background: #0f172a; border: 1px solid #475569; padding: 1rem; text-align: center; border-radius: 8px; cursor: pointer; }
+  .action-btn.completed { border-color: var(--ecg-green); color: var(--ecg-green); }
+  
+  .order-builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 0.5rem; align-items: end; margin-bottom: 1rem; }
+  #order-list { list-style: none; margin-bottom: 1rem; }
+  #order-list li { background: #0f172a; border: 1px solid var(--border); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+  
+  .cqi-banner { padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-weight: bold; }
+  .cqi-pass { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #4ade80; }
+  .cqi-fail { background: rgba(220, 38, 38, 0.2); border: 1px solid #dc2626; color: #f87171; }
+  
+  .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+  .list-box { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+</style>
+</head>
+<body>
+
+<div id="launch-screen">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Star_of_life2.svg/200px-Star_of_life2.svg.png" width="100" style="margin-bottom: 1rem; opacity: 0.8;" alt="EMS">
+  <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">SLFD CADRE: Pediatric Emergencies</h1>
+  <p style="max-width: 600px; font-size: 1.1rem; margin-bottom: 2rem;">Zero-Preset Clinical Cockpit. Assess and route pediatric patients utilizing the SLFD Pediatric Assessment Triangle (PAT) and weight-based pharmacopeia.</p>
+  <button class="btn-launch" onclick="initSim()">Start Clinical Simulation</button>
+</div>
+
+<div id="sidebar">
+  <div style="display:flex; justify-content: space-between; margin-bottom: 1rem; color: var(--text-muted);">
+    <span id="incident-id">CAD: ---</span>
+    <span id="scene-clock">00:00</span>
+  </div>
+  
+  <div class="monitor-box">
+    <div id="monitor-overlay" class="canvas-overlay">LEADS NOT ATTACHED</div>
+    <canvas id="ecgCanvas"></canvas>
+  </div>
+  
+  <div class="vitals-grid">
+    <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">HR</div><div class="vital-val hr-val" id="val-hr">---</div></div>
+    <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">SpO2</div><div class="vital-val spo2-val" style="color:#38bdf8;" id="val-spo2">---</div></div>
+    <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">NIBP (MANUAL)</div><div class="vital-val bp-val" style="color:#f87171;" id="val-bp">---</div></div>
+    <div class="vital-card"><div style="font-size:0.75rem;color:var(--text-muted)">Core Temp</div><div class="vital-val" id="val-temp" style="color:#eab308;">---</div></div>
+  </div>
+  
+  <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 0.2rem;">Live Findings Log</h3>
+  <div id="findings-log"></div>
+</div>
+
+<div id="main-workspace">
+  <div class="header">
+    <h2 id="phase-title">Phase 1: Dispatch & Doorway</h2>
+    <div><span style="color:var(--text-muted);">Current Scenario: </span><strong id="scenario-counter">1 / 5</strong></div>
+  </div>
+
+  <div id="phase-1" class="phase-section active">
+    <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-left: 4px solid var(--accent); margin-bottom: 1.5rem;">
+      <strong>Dispatch:</strong> <span id="text-dispatch"></span><br><br>
+      <strong>Doorway Impression:</strong> <span id="text-doorway"></span>
+    </div>
+    <label>Q1. What is the immediate life threat based on the Pediatric Assessment Triangle (PAT)?</label>
+    <textarea id="p1-q1" rows="3" placeholder="Enter clinical rationale..."></textarea>
+    <label>Q2. What is your initial diagnostic strategy and first intended intervention?</label>
+    <textarea id="p1-q2" rows="3" placeholder="Enter planned assessments and treatments..."></textarea>
+    <div style="text-align:right"><button class="btn-primary" onclick="goToPhase(2)">Proceed to Assessment</button></div>
+  </div>
+
+  <div id="phase-2" class="phase-section">
+    <p>Select physical assessments to uncover clinical data.</p>
+    <div class="action-grid" id="assessment-grid">
+      <button class="action-btn" onclick="runAssessment('Manual NIBP')">Obtain MANUAL NIBP</button>
+      <button class="action-btn" onclick="runAssessment('Lung Sounds')">Auscultate Lungs</button>
+      <button class="action-btn" onclick="runAssessment('SpO2')">Check SpO2</button>
+      <button class="action-btn" onclick="runAssessment('Temp')">Evaluate Core Temp</button>
+      <button class="action-btn" onclick="runAssessment('PAT')">Pediatric Assessment Triangle (PAT)</button>
+      <button class="action-btn" style="border-color: var(--ecg-green);" onclick="attachMonitor(this)">Apply Monitor</button>
+    </div>
+    <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="goToPhase(3)">Proceed to Differentials</button></div>
+  </div>
+
+  <div id="phase-3" class="phase-section">
+    <label>Select Final Working Diagnosis:</label>
+    <select id="select-diagnosis">
+      <option value="" disabled selected>-- Select Diagnosis --</option>
+      <option value="Neonatal Resuscitation">Neonatal Arrest / Resuscitation</option>
+      <option value="Epiglottitis">Epiglottitis</option>
+      <option value="Severe Asthma">Severe Reactive Airway Disease (<2yo)</option>
+      <option value="Hypoxic Bradycardia">Hypoxic Bradycardia</option>
+      <option value="Febrile Seizure">Febrile Seizure / Status Epilepticus</option>
+    </select>
+    
+    <label style="margin-top:1.5rem;">Select SLFD Protocol Justifications (Check all that apply):</label>
+    <div style="background: #0f172a; border: 1px solid var(--border); padding: 1rem; border-radius: 6px; height: 150px; overflow-y: auto; margin-bottom: 1rem;">
+      <div><input type="checkbox" id="ro1"> HR < 60 in pediatric patient with poor perfusion indicates CPR/Compressions[cite: 2]</div>
+      <div><input type="checkbox" id="ro2"> Nebulized Epinephrine is contraindicated in Epiglottitis[cite: 2]</div>
+      <div><input type="checkbox" id="ro3"> Severe distress in <2yo asthma requires 0.5mg Nebulized Epinephrine[cite: 2]</div>
+      <div><input type="checkbox" id="ro4"> PO medications are contraindicated in actively seizing/postictal patients[cite: 2]</div>
+    </div>
+
+    <label>Select Required SLFD Specialty Transport Path:</label>
+    <select id="select-form">
+      <option value="" disabled selected>-- Select Path --</option>
+      <option value="NICU Capable">NICU Capable Hospital (TCH / MH TMC)</option>
+      <option value="Standard Pediatric ER">Standard Pediatric ER</option>
+    </select>
+    <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="goToPhase(4)">Proceed to Treatment Builder</button></div>
+  </div>
+
+  <div id="phase-4" class="phase-section">
+    <p style="color: #f87171; font-weight: bold; font-size:0.9rem; margin-bottom:1rem;">WARNING: ZERO PRESETS. You must configure every aspect of the intervention manually based on SLFD formulas.</p>
+    <div class="order-builder-row">
+      <div><label>Intervention</label>
+        <select id="ob-med">
+          <option value="" selected>-- Select --</option>
+          <option value="Chest Compressions">Chest Compressions</option>
+          <option value="BVM Ventilation">BVM Oxygenation/Ventilation</option>
+          <option value="Epinephrine 1:1,000">Epinephrine 1:1,000 (Anaphylaxis/Cardiac)</option>
+          <option value="Epinephrine Nebulized">Epinephrine Nebulized</option>
+          <option value="Dexamethasone">Dexamethasone</option>
+          <option value="Ofirmev">Ofirmev (IV Acetaminophen)</option>
+          <option value="Acetaminophen PO">Acetaminophen PO</option>
+          <option value="Normal Saline">Normal Saline</option>
+          <option value="Atropine">Atropine</option>
+        </select>
+      </div>
+      <div><label>Dose/Amt</label><input type="text" id="ob-dose" placeholder="e.g. 0.01, 10, 0.5"></div>
+      <div><label>Unit</label>
+        <select id="ob-unit">
+          <option value="" selected>--</option>
+          <option value="mg">mg</option>
+          <option value="mg/kg">mg/kg</option>
+          <option value="ml/kg">ml/kg</option>
+          <option value="N/A">N/A</option>
+        </select>
+      </div>
+      <div><label>Route/Site</label>
+        <select id="ob-route">
+          <option value="" selected>--</option>
+          <option value="IV/IO">IV/IO</option>
+          <option value="PO">PO</option>
+          <option value="Nebulized">Nebulized</option>
+          <option value="N/A">N/A</option>
+        </select>
+      </div>
+      <div><button type="button" onclick="addOrder()">+ ADD</button></div>
+    </div>
+    <ul id="order-list"></ul>
+    <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="submitCQI()">Submit Plan to QA/QI</button></div>
+  </div>
+
+  <div id="phase-5" class="phase-section">
+    <div id="cqi-banner" class="cqi-banner"></div>
+    <div class="comparison-grid">
+      <div class="list-box">
+        <h3 style="color:#38bdf8; margin-bottom:1rem;">Your Cognitive Input</h3>
+        <p><strong>Q1:</strong> <span id="out-q1"></span></p>
+        <p><strong>Q2:</strong> <span id="out-q2"></span></p>
+        <p><strong>Diagnosis:</strong> <span id="out-dx"></span></p>
+      </div>
+      <div class="list-box">
+        <h3 style="color:#4ade80; margin-bottom:1rem;">SLFD Expert Benchmark</h3>
+        <p><strong>Life Threat:</strong> <span id="bench-q1"></span></p>
+        <p><strong>Strategy:</strong> <span id="bench-q2"></span></p>
+        <p><strong>Correct Treatments:</strong> <span id="bench-tx"></span></p>
+      </div>
+    </div>
+    <div class="comparison-grid">
+      <div class="list-box" style="border-color: #22c55e;">
+        <h3 style="color:#4ade80; margin-bottom:1rem;">Plus (+) Behaviors</h3>
+        <ul id="plus-list" style="padding-left:1.5rem; color:var(--text-muted);"></ul>
+      </div>
+      <div class="list-box" style="border-color: #dc2626;">
+        <h3 style="color:#f87171; margin-bottom:1rem;">Delta (Δ) Deviations</h3>
+        <ul id="delta-list" style="padding-left:1.5rem; color:var(--text-muted);"></ul>
+      </div>
+    </div>
+    <div id="just-culture-chain" style="display:none; background: #450a0a; border: 1px solid #dc2626; padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+      <h3 style="color:#fca5a5; margin-bottom:1rem;">CRITICAL FAILURE: SLFD Just Culture Error Reporting Chain[cite: 2]</h3>
+      <ol style="padding-left: 1.5rem; color: #fecaca; line-height: 1.8;">
+        <li>Manage the patient condition that resulted from the error.</li>
+        <li>Contact the Captain/EMS Division Chief immediately to report the error.</li>
+        <li>Inform the hospital staff of the error.</li>
+        <li>Inform Sugar Land Fire Department Medical Director.</li>
+        <li>Complete the error self-reporting form.</li>
+      </ol>
+    </div>
+    <div style="text-align:right; margin-top:2rem;"><button class="btn-primary" onclick="nextScenario()">Load Next Scenario</button></div>
+  </div>
+</div>
+
+<script>
+const scenarios = [
+  {
+    id: "CAD-2028-11-P1",
+    dispatch: "Newly Born - Limp & Cyanotic",
+    doorway: "Patient is full term but apneic, limp tone, and completely cyanotic. No grimace to stimulation.",
+    initialVitals: { hr: 45, bp: 'N/A', spo2: '65%', temp: '98.0' },
+    expertCognition: {
+      q1: "Neonatal cardiopulmonary compromise. APGAR is 1.",
+      q2: "HR < 60 requires immediate chest compressions, PPV, and Epinephrine 0.01mg/kg IV/IO[cite: 2]."
+    },
+    correctOrders: "Chest Compressions N/A N/A N/A, BVM Ventilation N/A N/A N/A, Epinephrine 1:1,000 0.01 mg/kg IV/IO, Normal Saline 10 ml/kg IV/IO",
+    fatalPitfalls: ["Atropine"],
+    requiredForms: "NICU Capable"
+  },
+  {
+    id: "CAD-2028-11-P2",
+    dispatch: "4 y/o Male - Severe Respiratory Distress",
+    doorway: "Tripod positioning, high fever, drooling heavily, unable to speak. Looks toxic.",
+    initialVitals: { hr: 140, bp: '90/60', spo2: '88%', temp: '102.5' },
+    expertCognition: {
+      q1: "Impending airway occlusion secondary to suspected Epiglottitis.",
+      q2: "Avoid agitation. Nebulized Epinephrine is contraindicated. Administer Dexamethasone and use BVM if airway fails[cite: 2]."
+    },
+    correctOrders: "Dexamethasone 0.6 mg/kg IV/IO",
+    fatalPitfalls: ["Epinephrine Nebulized"], 
+    requiredForms: "Standard Pediatric ER"
+  },
+  {
+    id: "CAD-2028-11-P3",
+    dispatch: "18-month-old Female - Severe Asthma Attack",
+    doorway: "Tachypnea, supraclavicular retractions, nasal flaring. Severe wheezing on expiration.",
+    initialVitals: { hr: 160, bp: '85/55', spo2: '85%', temp: '98.6' },
+    expertCognition: {
+      q1: "Severe Reactive Airway Disease in an infant < 2y/o.",
+      q2: "For severe distress < 2yo, SLFD protocol dictates Epinephrine 0.5mg Nebulized[cite: 2]."
+    },
+    correctOrders: "Epinephrine Nebulized 0.5 mg Nebulized",
+    fatalPitfalls: ["Acetaminophen PO"], 
+    requiredForms: "Standard Pediatric ER"
+  },
+  {
+    id: "CAD-2028-11-P4",
+    dispatch: "8-month-old Male - Lethargic / Cyanotic",
+    doorway: "Infant is lethargic, mottled skin, with poor peripheral pulses. Breathing is slow and irregular.",
+    initialVitals: { hr: 50, bp: '60/40', spo2: '75%', temp: '98.0' },
+    expertCognition: {
+      q1: "Hypoxic Bradycardia leading to poor systemic perfusion.",
+      q2: "Hypoxia is the most common cause of bradycardia[cite: 2]. Prioritize BVM oxygenation. HR < 60 with poor perfusion requires chest compressions[cite: 2]."
+    },
+    correctOrders: "BVM Ventilation N/A N/A N/A, Chest Compressions N/A N/A N/A",
+    fatalPitfalls: ["Atropine"], 
+    requiredForms: "Standard Pediatric ER"
+  },
+  {
+    id: "CAD-2028-11-P5",
+    dispatch: "3 y/o Female - Active Seizure",
+    doorway: "Patient experiencing active tonic-clonic movements for 8 minutes. Skin is hot to the touch.",
+    initialVitals: { hr: 150, bp: '90/60', spo2: '92%', temp: '103.8' },
+    expertCognition: {
+      q1: "Status epilepticus secondary to high fever.",
+      q2: "DO NOT give anything by mouth to a postictal/seizing patient. Administer Ofirmev 15mg/kg IV/IO[cite: 2]."
+    },
+    correctOrders: "Ofirmev 15 mg/kg IV/IO",
+    fatalPitfalls: ["Acetaminophen PO"], 
+    requiredForms: "Standard Pediatric ER"
+  }
+];
+
+let currIdx = 0, sceneClock = 0, clockInterval = null, monitorActive = false, orderQueue = [];
+const el = id => document.getElementById(id);
+
+function initSim() {
+  el('launch-screen').style.display = 'none';
+  loadScenario();
+}
+
+function loadScenario() {
+  const s = scenarios[currIdx];
+  monitorActive = false;
+  el('monitor-overlay').style.display = 'flex';
+  el('val-hr').innerText = '---'; el('val-spo2').innerText = '---'; el('val-bp').innerText = '---'; el('val-temp').innerText = '---';
+  el('findings-log').innerHTML = ''; orderQueue = []; el('order-list').innerHTML = '';
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('completed'));
+  el('p1-q1').value = ''; el('p1-q2').value = ''; el('select-diagnosis').value = ''; el('select-form').value = '';
+  el('text-dispatch').innerText = s.dispatch; el('text-doorway').innerText = s.doorway; el('incident-id').innerText = `CAD: ${s.id}`;
+  
+  sceneClock = 0; clearInterval(clockInterval);
+  clockInterval = setInterval(() => {
+    sceneClock++;
+    let m = Math.floor(sceneClock / 60).toString().padStart(2, '0');
+    let sec = (sceneClock % 60).toString().padStart(2, '0');
+    el('scene-clock').innerText = `${m}:${sec}`;
+  }, 1000);
+  goToPhase(1); drawCanvasLoop();
+}
+
+function goToPhase(num) {
+  document.querySelectorAll('.phase-section').forEach(p => p.classList.remove('active'));
+  el(`phase-${num}`).classList.add('active');
+  const titles = ["Dispatch & Doorway", "Assessment Action Bar", "Rule-Out Funnel", "Zero-Preset Order Builder", "CQI Debrief & Plus/Delta"];
+  el('phase-title').innerText = `Phase ${num}: ${titles[num-1]}`;
+}
+
+function logMsg(msg) {
+  let m = Math.floor(sceneClock / 60).toString().padStart(2, '0');
+  let sec = (sceneClock % 60).toString().padStart(2, '0');
+  el('findings-log').innerHTML += `<div>[${m}:${sec}] ${msg}</div>`;
+  el('findings-log').scrollTop = el('findings-log').scrollHeight;
+}
+
+function runAssessment(type) {
+  const s = scenarios[currIdx];
+  event.target.classList.add('completed');
+  if(type === 'Manual NIBP') { el('val-bp').innerText = s.initialVitals.bp; logMsg(`Manual BP: ${s.initialVitals.bp} mmHg[cite: 2].`); sceneClock += 30; }
+  if(type === 'Lung Sounds') { logMsg(`Auscultation complete.`); sceneClock += 15; }
+  if(type === 'SpO2') { el('val-spo2').innerText = s.initialVitals.spo2; logMsg(`SpO2: ${s.initialVitals.spo2}.`); sceneClock += 10; }
+  if(type === 'Temp') { el('val-temp').innerText = s.initialVitals.temp; logMsg(`Core Temp Evaluated: ${s.initialVitals.temp}.`); sceneClock += 20; }
+  if(type === 'PAT') { logMsg(`Pediatric Assessment Triangle complete: Appearance, Work of Breathing, Circulation[cite: 2].`); sceneClock += 15; }
+}
+
+function attachMonitor(btn) {
+  btn.classList.add('completed');
+  monitorActive = true; el('monitor-overlay').style.display = 'none';
+  el('val-hr').innerText = scenarios[currIdx].initialVitals.hr;
+  logMsg("Monitor attached."); sceneClock += 20;
+}
+
+function addOrder() {
+  const med = el('ob-med').value, dose = el('ob-dose').value, unit = el('ob-unit').value, route = el('ob-route').value;
+  if(!med || !dose || !unit || !route) return alert("Must complete all fields.");
+  const orderStr = `${med} ${dose} ${unit} ${route}`;
+  orderQueue.push(orderStr);
+  const li = document.createElement('li');
+  li.innerHTML = `<span>${orderStr}</span> <button style="background:#dc2626;" onclick="this.parentElement.remove(); orderQueue.splice(orderQueue.indexOf('${orderStr}'), 1)">X</button>`;
+  el('order-list').appendChild(li);
+}
+
+function submitCQI() {
+  const s = scenarios[currIdx]; clearInterval(clockInterval); goToPhase(5);
+  el('out-q1').innerText = el('p1-q1').value || "No response."; el('out-q2').innerText = el('p1-q2').value || "No response.";
+  el('out-dx').innerText = el('select-diagnosis').value || "None selected";
+  el('bench-q1').innerText = s.expertCognition.q1; el('bench-q2').innerText = s.expertCognition.q2; el('bench-tx').innerText = s.correctOrders;
+  
+  const pList = el('plus-list'), dList = el('delta-list'); pList.innerHTML = ''; dList.innerHTML = '';
+  let passed = true, fatalTriggered = false;
+  const fullOrderStr = orderQueue.join(" | ");
+  
+  s.fatalPitfalls.forEach(pitfall => {
+    if(fullOrderStr.includes(pitfall)) {
+      fatalTriggered = true; dList.innerHTML += `<li>FATAL PITFALL: Ordered ${pitfall}. Violates SLFD pediatric protocols[cite: 2].</li>`;
+    }
+  });
+
+  if(s.id === "CAD-2028-11-P1" && !fullOrderStr.includes("Chest Compressions")) {
+    dList.innerHTML += `<li>Major Deviation: Failed to initiate Chest Compressions for Neonate HR < 60[cite: 2].</li>`;
+    fatalTriggered = true;
+  }
+  
+  if(fatalTriggered) {
+    el('val-hr').innerText = '0'; el('val-bp').innerText = '0/0'; el('val-hr').style.color = '#dc2626';
+    el('cqi-banner').className = 'cqi-banner cqi-fail'; el('cqi-banner').innerText = "LEVEL 4 CQI MAJOR SAFETY DEVIATION";
+    el('just-culture-chain').style.display = 'block';
+  } else {
+    el('cqi-banner').className = 'cqi-banner cqi-pass'; el('cqi-banner').innerText = "CQI AUDIT COMPLETE";
+    el('just-culture-chain').style.display = 'none';
+    if(orderQueue.length > 0) pList.innerHTML += `<li>Treatments: ${fullOrderStr}</li>`; else dList.innerHTML += `<li>No treatments submitted.</li>`;
+  }
+}
+
+function nextScenario() { currIdx = (currIdx + 1) % scenarios.length; el('scenario-counter').innerText = `${currIdx + 1} / 5`; loadScenario(); }
+
+let ecgX = 0; 
+function drawCanvasLoop() {
+  const c = el('ecgCanvas'), ctx = c.getContext('2d');
+  if(c.width !== c.offsetWidth) { c.width = c.offsetWidth; c.height = c.offsetHeight; }
+  ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0,0,c.width,c.height);
+  
+  if (monitorActive && el('val-hr').innerText !== '0' && el('val-hr').innerText !== '---') {
+    let hr = parseInt(el('val-hr').innerText) || 80, cycleLen = Math.floor(6000 / hr);
+    ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ecgX, 50);
+    let y = 50 + Math.sin(ecgX/10)*2;
+    if(ecgX % cycleLen > (cycleLen - 10) && ecgX % cycleLen < (cycleLen - 5)) y = 10; 
+    ctx.lineTo(ecgX+2, y); ctx.stroke(); ecgX += 2; if(ecgX > c.width) ecgX = 0;
+  } else if (monitorActive && el('val-hr').innerText === '0') {
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ecgX, 50); ctx.lineTo(ecgX+2, 50); ctx.stroke();
+    ecgX += 2; if(ecgX > c.width) ecgX = 0;
+  }
+  requestAnimationFrame(drawCanvasLoop);
+}
+</script>
+</body>
+</html>
